@@ -34,6 +34,7 @@ async function processEvents() {
     );
 
     
+    
     const multi = redisClient.multi();
     for (const [eventName, count] of Object.entries(batchCounts)) {
      

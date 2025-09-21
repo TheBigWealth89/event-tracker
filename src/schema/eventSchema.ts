@@ -6,6 +6,7 @@ export const trackEventSchema = z.object({
   url: z.string({ message: "A valid url is required" }),
 
   userId: z.string().optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 // This creates a TypeScript type from our schema for type safety
