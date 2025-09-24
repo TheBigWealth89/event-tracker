@@ -1,31 +1,31 @@
-import { redisClient, connectAll } from "../db/connection";
+import { redisClient, connectAll, pool } from "../db/connection";
 import logger from "../utils/logger";
 
 const AGGREGATION_KEY = "analytics:event_counts"; // The name of our Redis Hash
 const STREAM_KEY = "events";
+const BOOKMARK_KEY = "analytics_worker:last_id";
 
-let lastReadId = "0-0";
-
-async function processEvents() {
+async function processEvents(lastReadId: string): Promise<string> {
+  let nextReadId = lastReadId;
   try {
     const response = await redisClient.xread(
       "BLOCK",
       5000,
       "STREAMS",
       STREAM_KEY,
-      lastReadId // start ID
+      nextReadId // start ID
     );
 
-    console.log("Event Response", response?.entries);
 
+    logger.info("Coming nextread id ", nextReadId)
     if (!response) {
       logger.info("No new events in the last 5 seconds");
-      return;
+      return nextReadId;
     }
 
     const [streamName, entries] = response[0];
     if (entries.length === 0) {
-      return;
+      return nextReadId;
     }
 
     logger.info(`Processing a batch of ${entries.length} events.`);
@@ -34,9 +34,8 @@ async function processEvents() {
     for (const [id, fields] of entries) {
       const eventData: Record<string, string> = {};
       for (let i = 0; i < fields.length; i += 2) {
-        eventData[fields[1]] = fields[i + 1];
+        eventData[fields[i]] = fields[i + 1];
       }
-      console.log("My code is still running here ");
 
       const eventName = eventData.eventName || "Unknown";
       //HINCRBY to do math inside Redis
@@ -44,13 +43,50 @@ async function processEvents() {
     }
     await multi.exec();
 
-    //Update our events to the ID of the LAST event we just processed.
-    lastReadId = entries[entries.length - 1][0];
+    // Update our bookmark to the ID of the LAST event we just processed.
+    nextReadId = entries[entries.length - 1][0];
+    logger.info("update our bookmark", nextReadId)
+
+    // Save the bookmark back to Redis.
+    await redisClient.set(BOOKMARK_KEY, nextReadId);
+
+    //Get all the aggregate
     const grandTotals = await redisClient.hgetall(AGGREGATION_KEY);
-    console.log("Updated Grand Totals:", grandTotals);
+
+    // ... after you've calculated grandTotals ...
+    console.log("Updated Grand Totals in Redis:", grandTotals);
+
+    // WRITING TO POSTGRESQL 
+    if (Object.keys(grandTotals).length > 0) {
+      logger.info("Writing aggregated totals to TimescaleDB...");
+      try {
+        const values: (string | number)[] = [];
+        const valueStrings: string[] = [];
+        let paramIndex = 1;
+
+        for (const [eventName, count] of Object.entries(grandTotals)) {
+          valueStrings.push(`(NOW(), $${paramIndex}, $${paramIndex + 1})`);
+          values.push(eventName, count);
+          paramIndex += 2;
+        }
+
+        const queryText = `
+            INSERT INTO event_counts (bucket, event_name, count)
+            VALUES ${valueStrings.join(", ")} 
+            ON CONFLICT (bucket, event_name) DO UPDATE
+            SET count = event_counts.count + EXCLUDED.count;
+        `;
+
+        await pool.query(queryText, values);
+        logger.info("✅ Successfully updated totals in TimescaleDB.");
+      } catch (dbError) {
+        logger.error("❌ Failed to write to TimescaleDB:", dbError);
+      }
+    }
   } catch (err) {
     logger.error("Error in worker:", err);
   }
+  return nextReadId;
 }
 
 async function startWorker() {
@@ -58,8 +94,14 @@ async function startWorker() {
   logger.info(
     `🚀 Stream worker started. Listening for events on stream '${STREAM_KEY}'.`
   );
+
+  // Get the last saved bookmark from Redis.
+  let lastReadId = (await redisClient.get(BOOKMARK_KEY)) || "0-0";
+  logger.info(`Starting stream from last known ID: ${lastReadId}`);
+
   while (true) {
-    await processEvents();
+    // Pass the current bookmark in, get the next one back.
+    lastReadId= await processEvents(lastReadId);
   }
 }
 

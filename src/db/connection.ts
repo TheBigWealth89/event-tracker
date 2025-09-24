@@ -1,7 +1,17 @@
-
-import "../config/loadEnv"
+import "../config/loadEnv";
 import Redis from "ioredis";
 import logger from "../utils/logger";
+import { Pool } from "pg";
+
+// --- PostgreSQL Connection ---
+export const pool = new Pool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
+  ssl: { rejectUnauthorized: false },
+});
 // --- Redis Connection ---
 const redisUrl: string = process.env.REDIS_URL || "";
 export const redisClient = new Redis(redisUrl, {
@@ -12,6 +22,10 @@ export const redisClient = new Redis(redisUrl, {
     ? { rejectUnauthorized: false }
     : undefined,
 });
+
+// --- Connection Event Listeners ---
+pool.on("connect", () => logger.info("PostgreSQL client acquired"));
+pool.on("error", (err) => logger.error("PostgreSQL pool error:", err));
 
 redisClient.on("connect", () =>
   logger.info(`Redis connecting......... ${redisUrl}`)
@@ -27,6 +41,10 @@ export async function connectAll(): Promise<void> {
 
   try {
     logger.info("🚀 Initializing all connections...");
+    
+    await pool.connect();
+    logger.info("✅ PostgreSQL connected.");
+
     //Checking status because ioredis connects automatically
     if (redisClient.status !== "ready") {
       logger.info("⏳ Waiting for Redis connection...");
