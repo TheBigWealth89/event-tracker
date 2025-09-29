@@ -9,7 +9,7 @@ route.post(
   "/track",
   validate(trackEventSchema),
   async (req: Request<{}, {}, TrackEventInput>, res: Response) => {
-    const eventPayload = req.body;
+    const eventPaylad = req.body;
     console.log("PayLoad coming:", eventPayload);
     try {
       const res1 = await redisClient.xadd(
