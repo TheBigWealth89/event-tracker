@@ -8,11 +8,11 @@ const route = express.Router();
 route.post(
   "/track",
   validate(trackEventSchema),
-  async (req: Request<{}, {}, TrackEventInput>, res: Response) => {
+  async (req: Request<{}, {}, TrackEventInput>, res: Response)  {
     const eventPayload = req.body;
     console.log("PayLoad coming:", eventPayload);
-    try 
-      const res1  await redisClient.xadd(
+    try {
+      const res1 = await redisClient.xadd(
         "events",
         "*",
         "userId",
@@ -25,7 +25,8 @@ route.post(
         JSON.stringify(eventPayload.metadata ?? {})
       );
       logger.info("ID's", res1);
-        res.status(200).json({
+  
+      res.status(200).json({
         success: true,
         event: eventPayload,
       });
