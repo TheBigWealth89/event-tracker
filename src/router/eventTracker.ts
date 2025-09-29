@@ -19,14 +19,13 @@ route.post(
         eventPayload.userId ?? "",
         "eventName",
         eventPayload.eventName ?? "",
-        "url",
+        "url"
         eventPayload.url ?? "",
         "metadata",
         JSON.stringify(eventPayload.metadata ?? {})
       );
       logger.info("ID's", res1);
-      console.log(res1)
-      res.status(200).json({
+        res.status(200).json({
         success: true,
         event: eventPayload,
       });
