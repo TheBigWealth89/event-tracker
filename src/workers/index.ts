@@ -76,7 +76,7 @@ async function processEvents(lastReadId: string): Promise<string> {
             ON CONFLICT (bucket, event_name) DO UPDATE
             SET count = event_counts.count + EXCLUDED.count;
         `;
-
+ 
         await pool.query(queryText, values);
         logger.info("✅ Successfully updated totals in TimescaleDB.");
       } catch (dbError) {
