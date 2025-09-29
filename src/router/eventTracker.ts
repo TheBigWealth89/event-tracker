@@ -6,7 +6,7 @@ import logger from "../utils/logger";
 
 const route = express.Router();
 route.post(
-  "/track",
+  "/track"
   validate(trackEventSchema),
   async (req: Request<{}, {}, TrackEventInput>, res: Response)  {
     const eventPayload = req.body;
