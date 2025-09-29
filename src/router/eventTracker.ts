@@ -12,14 +12,14 @@ route.post(
     const eventPayload = req.body;
     console.log("PayLoad coming:", eventPayload);
     try {
-      const res1 = await redisClient.xadd(
+      const res1  await redisClient.xadd(
         "events",
         "*",
         "userId",
         eventPayload.userId ?? "",
         "eventName",
         eventPayload.eventName ?? "",
-        "url"
+        "url",
         eventPayload.url ?? "",
         "metadata",
         JSON.stringify(eventPayload.metadata ?? {})
