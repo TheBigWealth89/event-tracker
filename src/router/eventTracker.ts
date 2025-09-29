@@ -4,11 +4,11 @@ import { trackEventSchema, TrackEventInput } from "../schema/eventSchema";
 import { redisClient } from "../db/connection";
 import logger from "../utils/logger";
 
-const route = express.Router();
+const route  express.Router();
 route.post(
-  "/track"
+  "/track",
   validate(trackEventSchema),
-  async (req: Request<{}, {}, TrackEventInput>, res: Response)  {
+  async (req: Request<{}, {}, TrackEventInput>, res: Response) => {
     const eventPayload = req.body;
     console.log("PayLoad coming:", eventPayload);
     try {
