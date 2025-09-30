@@ -1,8 +1,9 @@
-import { ZodObject, ZodError } from "zod";
+import { ZodObject, ZodError, ZodRawShape } from "zod";
 import { Request, Response, NextFunction } from "express";
 
 export const validate =
-  (schema: ZodObject) => (req: Request, res: Response, next: NextFunction) => {
+  <T extends ZodRawShape>(schema: ZodObject<T>) => 
+  (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);
 
     if (!result.success) {
@@ -11,6 +12,6 @@ export const validate =
     }
 
     // Replace req.body with the **sanitized** and **typed** data
-    req.body = result.data as any;
+    req.body = result.data;
     return next();
   };

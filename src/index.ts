@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import { connectAll } from "./db/connection";
 import trackRouter from "./router/eventTracker";
 import { ZodError } from "zod";
@@ -8,7 +8,7 @@ const app = express();
 app.use(express.json());
 const PORT = 5000;
 
-app.use((err: any, req: any, res: any, next: any) => {
+app.use((err: unknown, req: Request, res: Response) => {
   if (err instanceof ZodError) {
     const { fieldErrors } = err.flatten();
     return res.status(400).json({ errors: fieldErrors });

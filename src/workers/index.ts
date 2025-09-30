@@ -23,7 +23,7 @@ async function processEvents(lastReadId: string): Promise<string> {
       return nextReadId;
     }
 
-    const [streamName, entries] = response[0];
+    const [, entries] = response[0];
     if (entries.length === 0) {
       return nextReadId;
     }
@@ -31,7 +31,7 @@ async function processEvents(lastReadId: string): Promise<string> {
     logger.info(`Processing a batch of ${entries.length} events.`);
 
     const multi = redisClient.multi();
-    for (const [id, fields] of entries) {
+    for (const [, fields] of entries) {
       const eventData: Record<string, string> = {};
       for (let i = 0; i < fields.length; i += 2) {
         eventData[fields[i]] = fields[i + 1];

@@ -8,7 +8,7 @@ const route = express.Router();
 route.post(
   "/track",
   validate(trackEventSchema),
-  async (req: Request<{}, {}, TrackEventInput>, res: Response) => {
+  async (req: Request<object, object, TrackEventInput>, res: Response) => {
     const eventPayload = req.body;
     try {
       const res1 = await redisClient.xadd(
@@ -29,7 +29,13 @@ route.post(
         success: true,
         event: eventPayload,
       });
-    } catch (err) {}
+    } catch (err) {
+      logger.error("Failed to track event", err);
+      res.status(500).json({
+        success: false,
+        message: "Failed to track event"
+      });
+    }
   }
 );
 
