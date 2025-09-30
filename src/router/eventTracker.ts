@@ -10,7 +10,6 @@ route.post(
   validate(trackEventSchema),
   async (req: Request<{}, {}, TrackEventInput>, res: Response) => {
     const eventPayload = req.body;
-    console.log("PayLoad coming:", eventPayload);
     try {
       const res1 = await redisClient.xadd(
         "events",
@@ -30,9 +29,7 @@ route.post(
         success: true,
         event: eventPayload,
       });
-    } catch (err) {
-      logger.error("failed to add events", err);
-    }
+    } catch (err) {}
   }
 );
 

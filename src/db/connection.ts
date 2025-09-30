@@ -41,7 +41,7 @@ export async function connectAll(): Promise<void> {
 
   try {
     logger.info("🚀 Initializing all connections...");
-    
+
     await pool.connect();
     logger.info("✅ PostgreSQL connected.");
 
