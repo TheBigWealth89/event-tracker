@@ -4,15 +4,15 @@ import { trackEventSchema, TrackEventInput } from "../schema/eventSchema";
 import { redisClient } from "../db/connection";
 import logger from "../utils/logger";
 
-const route  express.Router();
+const route = express.Router();
 route.post(
   "/track",
   validate(trackEventSchema),
   async (req: Request<{}, {}, TrackEventInput>, res: Response) => {
-    const eventPaylad = req.body;
+    const eventPayload = req.body;
     console.log("PayLoad coming:", eventPayload);
     try {
-      const res1 = await redisClient.xadd(
+      const res1  await redisClient.xadd(
         "events",
         "*",
         "userId",
@@ -25,7 +25,7 @@ route.post(
         JSON.stringify(eventPayload.metadata ?? {})
       );
       logger.info("ID's", res1);
-  
+      console.log(res1)
       res.status(200).json({
         success: true,
         event: eventPayload,
