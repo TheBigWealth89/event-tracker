@@ -10,9 +10,8 @@ route.post(
   validate(trackEventSchema),
   async (req: Request<object, object, TrackEventInput>, res: Response) => {
     const eventPayload = req.body;
-    const name: string = 10;
     try {
-      const res1 = await redisClient.xadd(
+      await redisClient.xadd(
         "events",
         "*",
         "userId",
@@ -24,7 +23,6 @@ route.post(
         "metadata",
         JSON.stringify(eventPayload.metadata ?? {})
       );
-      console.log(res1);
       res.status(200).json({
         success: true,
         event: eventPayload,
