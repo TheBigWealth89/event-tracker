@@ -2,7 +2,7 @@ import { ZodObject, ZodError, ZodRawShape } from "zod";
 import { Request, Response, NextFunction } from "express";
 
 export const validate =
-  <T extends ZodRawShape>(schema: ZodObject<T>) => 
+  <T extends ZodRawShape>(schema: ZodObject<T>) =>
   (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);
 

@@ -16,8 +16,7 @@ async function processEvents(lastReadId: string): Promise<string> {
       nextReadId // start ID
     );
 
-
-    logger.info("Coming nextread id ", nextReadId)
+    logger.info("Coming nextread id ", nextReadId);
     if (!response) {
       logger.info("No new events in the last 5 seconds");
       return nextReadId;
@@ -45,7 +44,7 @@ async function processEvents(lastReadId: string): Promise<string> {
 
     // Update our bookmark to the ID of the LAST event we just processed.
     nextReadId = entries[entries.length - 1][0];
-    logger.info("update our bookmark", nextReadId)
+    logger.info("update our bookmark", nextReadId);
 
     // Save the bookmark back to Redis.
     await redisClient.set(BOOKMARK_KEY, nextReadId);
@@ -56,7 +55,7 @@ async function processEvents(lastReadId: string): Promise<string> {
     // ... after you've calculated grandTotals ...
     console.log("Updated Grand Totals in Redis:", grandTotals);
 
-    // WRITING TO POSTGRESQL 
+    // WRITING TO POSTGRESQL
     if (Object.keys(grandTotals).length > 0) {
       logger.info("Writing aggregated totals to TimescaleDB...");
       try {
@@ -76,7 +75,7 @@ async function processEvents(lastReadId: string): Promise<string> {
             ON CONFLICT (bucket, event_name) DO UPDATE
             SET count = event_counts.count + EXCLUDED.count;
         `;
- 
+
         await pool.query(queryText, values);
         logger.info("✅ Successfully updated totals in TimescaleDB.");
       } catch (dbError) {
@@ -101,7 +100,7 @@ async function startWorker() {
 
   while (true) {
     // Pass the current bookmark in, get the next one back.
-    lastReadId= await processEvents(lastReadId);
+    lastReadId = await processEvents(lastReadId);
   }
 }
 

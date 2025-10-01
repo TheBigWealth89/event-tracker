@@ -3,13 +3,22 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
- "scripts": {
+  "scripts": {
     "dev": "-w ts-node & nodemon src/index.ts",
     "test": "echo \"No tests yet\" && exit 0",
     "prepare": "husky",
     "lint": "eslint . --ext .ts",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "typecheck": "tsc --noEmit"
-},
+  },
+  "*.{ts,tsx}": [
+    "prettier --write",
+    "eslint --fix"
+  ],
+  "*.{json,md}": [
+    "prettier --write"
+  ],
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -17,10 +26,12 @@
     "@eslint/js": "^9.36.0",
     "@types/express": "^5.0.3",
     "@types/node": "^24.5.2",
+    "chalk-cli": "^6.0.0",
     "dotenv": "^17.2.2",
     "eslint": "^9.36.0",
     "husky": "^9.1.7",
     "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.45.0"

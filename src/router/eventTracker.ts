@@ -10,6 +10,7 @@ route.post(
   validate(trackEventSchema),
   async (req: Request<object, object, TrackEventInput>, res: Response) => {
     const eventPayload = req.body;
+    const name: string = 10;
     try {
       const res1 = await redisClient.xadd(
         "events",
@@ -23,7 +24,6 @@ route.post(
         "metadata",
         JSON.stringify(eventPayload.metadata ?? {})
       );
-      logger.info("ID's", res1);
       console.log(res1);
       res.status(200).json({
         success: true,
@@ -33,7 +33,7 @@ route.post(
       logger.error("Failed to track event", err);
       res.status(500).json({
         success: false,
-        message: "Failed to track event"
+        message: "Failed to track event",
       });
     }
   }
