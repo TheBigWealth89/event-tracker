@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "-w ts-node & nodemon src/index.ts",
+    "dev:worker": "npx ts-node src/workers/index.ts",
     "test": "echo \"No tests yet\" && exit 0",
     "prepare": "husky",
     "lint": "eslint . --ext .ts",
@@ -26,7 +27,6 @@
     "@eslint/js": "^9.36.0",
     "@types/express": "^5.0.3",
     "@types/node": "^24.5.2",
-    "chalk-cli": "^6.0.0",
     "dotenv": "^17.2.2",
     "eslint": "^9.36.0",
     "husky": "^9.1.7",

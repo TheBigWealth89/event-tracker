@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # Redis - Message Queue & Stream Storage
+  redis:
+    image: redis:7-alpine
+    container_name: event-tracker-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - event-tracker-network
+
+  # PostgreSQL (TimescaleDB) - Analytics Database
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: event-tracker-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-analytics}
+      POSTGRES_USER: ${DB_USER:-eventuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-eventpass123}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eventuser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - event-tracker-network
+
+  # API Server - Handles HTTP requests
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: event-tracker-api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      REDIS_URL: ${REDIS_URL}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${DB_NAME:-analytics}
+      POSTGRES_USER: ${DB_USER:-eventuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-eventpass123}
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: ["node", "dist/index.js"]
+    restart: unless-stopped
+    networks:
+      - event-tracker-network
+    # mount source for hot-reload in development
+    volumes:
+      - ./src:/app/src
+
+  # Worker - Processes events from Redis stream
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: event-tracker-worker
+    environment:
+      NODE_ENV: production
+      REDIS_URL:  ${REDIS_URL}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${DB_NAME:-analytics}
+      POSTGRES_USER: ${DB_USER:-eventuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-eventpass123}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: ["node", "dist/workers/index.js"]
+    restart: unless-stopped
+    networks:
+      - event-tracker-network
+
+# Volumes - Persist data across container restarts
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+# Networks - Allow containers to communicate
+networks:
+  event-tracker-network:
+    driver: bridge

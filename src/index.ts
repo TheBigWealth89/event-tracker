@@ -17,6 +17,11 @@ app.use((err: unknown, req: Request, res: Response) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
+// Health checks
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 app.use("/", trackRouter);
 
 (async () => {
