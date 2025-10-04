@@ -1,4 +1,3 @@
-// eslint.config.js
 import globals from "globals";
 import tseslint from "typescript-eslint";
 import eslint from "@eslint/js";
@@ -19,8 +18,8 @@ export default tseslint.config(
       },
     },
     rules: {
-      // You can add custom rules here, for example:
-      // 'no-console': 'warn', // Warn if you accidentally leave a console.log
+      //  Custom rules here, for example:
+
     },
   }
 );
