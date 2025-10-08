@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import dotenv from "dotenv";
 import logger from "../utils/logger";
 
 function loadEnvironmentVariables() {
@@ -18,7 +19,6 @@ function loadEnvironmentVariables() {
       return;
     }
 
-    const dotenv = require("dotenv");
     const result = dotenv.config({ path: envPath });
 
     if (result.error) {
@@ -31,7 +31,7 @@ function loadEnvironmentVariables() {
       typeof err === "object" &&
       err !== null &&
       "code" in err &&
-      (err as any).code === "MODULE_NOT_FOUND"
+      err.code === "MODULE_NOT_FOUND"
     ) {
       logger.warn("'dotenv' module not found. This is expected in production.");
     } else {
