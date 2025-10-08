@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { connectAll } from "./db/connection";
 import trackRouter from "./router/eventTracker";
 import { ZodError } from "zod";
@@ -8,21 +8,23 @@ const app = express();
 app.use(express.json());
 const PORT = 5000;
 
-app.use((err: unknown, req: Request, res: Response) => {
-  if (err instanceof ZodError) {
-    const { fieldErrors } = err.flatten();
-    return res.status(400).json({ errors: fieldErrors });
-  }
-  console.error(err);
-  res.status(500).json({ message: "Internal server error" });
-});
 
 // Health checks
-app.get("/health", (req, res) => {
+app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 app.use("/", trackRouter);
+
+// Error handling middleware must be registered after routes and have 4 args
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof ZodError) {
+    const { fieldErrors } = err.flatten();
+    return res.status(400).json({ errors: fieldErrors });
+  }
+  logger.error(err);
+  res.status(500).json({ message: "Internal server error" });
+});
 
 (async () => {
   try {

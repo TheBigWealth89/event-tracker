@@ -57,7 +57,7 @@ async function processEvents(lastReadId: string): Promise<string> {
 
     // WRITING TO POSTGRESQL
     if (Object.keys(grandTotals).length > 0) {
-      logger.info("Writing aggregated totals to TimescaleDB...");
+      console.log("Writing aggregated totals to TimescaleDB...");
       try {
         const values: (string | number)[] = [];
         const valueStrings: string[] = [];
@@ -68,7 +68,7 @@ async function processEvents(lastReadId: string): Promise<string> {
           values.push(eventName, count);
           paramIndex += 2;
         }
-
+        console.log("Writing to db");
         const queryText = `
             INSERT INTO event_counts (bucket, event_name, count)
             VALUES ${valueStrings.join(", ")} 
@@ -77,7 +77,7 @@ async function processEvents(lastReadId: string): Promise<string> {
         `;
 
         await pool.query(queryText, values);
-        logger.info("✅ Successfully updated totals in TimescaleDB.");
+        console.log("✅ Successfully updated totals in TimescaleDB.");
       } catch (dbError) {
         logger.error("❌ Failed to write to TimescaleDB:", dbError);
       }

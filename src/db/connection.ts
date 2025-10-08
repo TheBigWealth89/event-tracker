@@ -3,6 +3,8 @@ import Redis from "ioredis";
 import logger from "../utils/logger";
 import { Pool } from "pg";
 
+const sslConfig =
+  process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false; // Use SSL in production (like on Render)
 // --- PostgreSQL Connection ---
 export const pool = new Pool({
   host: process.env.DB_HOST,
@@ -10,7 +12,7 @@ export const pool = new Pool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
-  ssl: { rejectUnauthorized: false },
+  ssl: sslConfig,
 });
 // --- Redis Connection ---
 const redisUrl: string = process.env.REDIS_URL || "";
