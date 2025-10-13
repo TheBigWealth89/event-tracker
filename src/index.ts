@@ -26,7 +26,7 @@ app.get("/health", (req: Request, res: Response) => {
 app.use("/", trackRouter);
 
 // Error handling middleware must be registered after routes and have 4 args
-app.use((err: unknown, req: Request, res: Response, next: Function) => {
+app.use((err: unknown, res: Response) => {
   if (err instanceof ZodError) {
     const { fieldErrors } = err.flatten();
     return res.status(400).json({ errors: fieldErrors });

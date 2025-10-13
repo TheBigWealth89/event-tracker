@@ -28,7 +28,7 @@ const subscriber = redisClient.duplicate();
 async function setupPubSub() {
   await subscriber.subscribe("analytics-updates");
   // Subscribe to the channel that your worker will publish to
-   subscriber.on("message", (message: string, channel: string) => {
+  subscriber.on("message", (message: string, channel: string) => {
     try {
       logger.info(`Received analytics update from ${channel}`);
       const parsed = JSON.parse(message);

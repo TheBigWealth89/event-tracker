@@ -51,7 +51,7 @@ async function processEvents(lastReadId: string): Promise<string> {
 
     //Get all the aggregate
     const grandTotals = await redisClient.hgetall(AGGREGATION_KEY);
-    redisClient.publish("analytics-updates", JSON.stringify(grandTotals)); 
+    redisClient.publish("analytics-updates", JSON.stringify(grandTotals));
 
     // ... after you've calculated grandTotals ...
     console.log("Updated Grand Totals in Redis:", grandTotals);
