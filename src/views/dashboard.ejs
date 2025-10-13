@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Tracker Dashboard</title>
+      <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📊 Event Tracker</h1>
+      <p>Real-time event monitoring and analytics</p>
+    </div>
+
+    <% if (events && events.length > 0) { %>
+      <% 
+        const totalEvents = events.reduce((sum, event) => sum + event.count, 0);
+        const topEvent = events.reduce((max, event) => event.count > max.count ? event : max, events[0]);
+        const avgEvents = Math.round(totalEvents / events.length);
+      %>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>Total Events</h3>
+          <div class="stat-value"><%= totalEvents.toLocaleString() %></div>
+          <div class="stat-label">All time</div>
+        </div>
+        
+        <div class="stat-card">
+          <h3>Event Types</h3>
+          <div class="stat-value"><%= events.length %></div>
+          <div class="stat-label">Unique events</div>
+        </div>
+        
+        <div class="stat-card">
+          <h3>Top Event</h3>
+          <div class="stat-value"><%= topEvent.count.toLocaleString() %></div>
+          <div class="stat-label"><%= topEvent.name %></div>
+        </div>
+        
+        <div class="stat-card">
+          <h3>Average</h3>
+          <div class="stat-value"><%= avgEvents.toLocaleString() %></div>
+          <div class="stat-label">Per event type</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-header">
+          <h2>Event Breakdown</h2>
+          <button class="refresh-btn" onclick="location.reload()">
+            🔄 Refresh
+          </button>
+        </div>
+
+        <div class="event-list">
+          <% events.sort((a, b) => b.count - a.count).forEach((event, index) => { %>
+            <div class="event-item">
+              <div class="event-name">
+                <div class="event-icon"><%= event.name.charAt(0).toUpperCase() %></div>
+                <%= event.name %>
+              </div>
+              <div class="event-count"><%= event.count.toLocaleString() %></div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="chart-container">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+          </svg>
+          <h3>No Events Yet</h3>
+          <p>Start tracking events to see them appear here</p>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</body>
+</html>
