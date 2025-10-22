@@ -16,7 +16,8 @@ async function processEvents(lastReadId: string): Promise<string> {
       nextReadId // start ID
     );
 
-    logger.info("Coming nextread id ", nextReadId);
+    logger.info("Coming nextRead id: ", nextReadId);
+
     if (!response) {
       logger.info("No new events in the last 5 seconds");
       return nextReadId;
@@ -51,7 +52,6 @@ async function processEvents(lastReadId: string): Promise<string> {
 
     const grandTotals = await redisClient.hgetall(AGGREGATION_KEY);
     redisClient.publish("analytics-update", JSON.stringify(grandTotals));
-    logger.info("Successfully published");
 
     console.log("Updated Grand Totals in Redis:", grandTotals);
 

@@ -7,7 +7,7 @@ import logger from "../utils/logger";
 const route = express.Router();
 
 const AGGREGATION_KEY = "analytics:event_counts";
-route.get("/", async (req, res) => {
+route.get("/dashboard", async (req, res) => {
   try {
     const eventCounts = await redisClient.hgetall(AGGREGATION_KEY);
 
