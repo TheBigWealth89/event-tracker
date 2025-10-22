@@ -49,11 +49,10 @@ async function processEvents(lastReadId: string): Promise<string> {
     // Save the bookmark back to Redis.
     await redisClient.set(BOOKMARK_KEY, nextReadId);
 
-    //Get all the aggregate
     const grandTotals = await redisClient.hgetall(AGGREGATION_KEY);
-    redisClient.publish("analytics-updates", JSON.stringify(grandTotals));
+    redisClient.publish("analytics-update", JSON.stringify(grandTotals));
+    logger.info("Successfully published");
 
-    // ... after you've calculated grandTotals ...
     console.log("Updated Grand Totals in Redis:", grandTotals);
 
     // WRITING TO POSTGRESQL
@@ -80,7 +79,7 @@ async function processEvents(lastReadId: string): Promise<string> {
         await pool.query(queryText, values);
         console.log("✅ Successfully updated totals in TimescaleDB.");
       } catch (dbError) {
-        logger.error("❌ Failed to write to TimescaleDB:", dbError);
+        logger.error("Failed to write to TimescaleDB:", dbError);
       }
     }
   } catch (err) {
@@ -92,7 +91,7 @@ async function processEvents(lastReadId: string): Promise<string> {
 async function startWorker() {
   await connectAll();
   logger.info(
-    `🚀 Stream worker started. Listening for events on stream '${STREAM_KEY}'.`
+    `Stream worker started. Listening for events on stream '${STREAM_KEY}'.`
   );
 
   // Get the last saved bookmark from Redis.

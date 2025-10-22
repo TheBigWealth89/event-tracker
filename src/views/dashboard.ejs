@@ -9,7 +9,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>📊 Event Tracker</h1>
+      <h1>Event Tracker</h1>
       <p>Real-time event monitoring and analytics</p>
     </div>
 
@@ -50,7 +50,7 @@
         <div class="chart-header">
           <h2>Event Breakdown</h2>
           <button class="refresh-btn" onclick="location.reload()">
-            🔄 Refresh
+            Refresh
           </button>
         </div>
 
@@ -79,5 +79,81 @@
       </div>
     <% } %>
   </div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+  function updateDashboard(eventCounts) {
+    console.log('Updating dashboard with:', eventCounts);
+    
+    // Convert eventCounts object to array
+    const events = Object.entries(eventCounts).map(([name, count]) => ({
+      name,
+      count: parseInt(count, 10)
+    }));
+
+    // Check if we have events
+    if (events.length === 0) {
+      console.log('No events to display');
+      return;
+    }
+
+    // Calculate statistics
+    const totalEvents = events.reduce((sum, event) => sum + event.count, 0);
+    console.log("Total events: ", totalEvents)
+    const topEvent = events.reduce((max, event) => event.count > max.count ? event : max, events[0]);
+    const avgEvents = Math.round(totalEvents / events.length);
+
+    // Update statistics cards
+    document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = totalEvents.toLocaleString();
+    document.querySelector('.stat-card:nth-child(2) .stat-value').textContent = events.length;
+    document.querySelector('.stat-card:nth-child(3) .stat-value').textContent = topEvent.count.toLocaleString();
+    document.querySelector('.stat-card:nth-child(3) .stat-label').textContent = topEvent.name;
+    document.querySelector('.stat-card:nth-child(4) .stat-value').textContent = avgEvents.toLocaleString();
+
+    // Update event list
+    const eventList = document.querySelector('.event-list');
+    eventList.innerHTML = '';
+
+    events.sort((a, b) => b.count - a.count).forEach((event, index) => {
+      const eventItem = document.createElement('div');
+      eventItem.className = 'event-item';
+      eventItem.innerHTML = `
+        <div class="event-name">
+          <div class="event-icon">${event.name.charAt(0).toUpperCase()}</div>
+          ${event.name}
+        </div>
+        <div class="event-count">${event.count.toLocaleString()}</div>
+      `;
+      eventList.appendChild(eventItem);
+    });
+
+    // Show the content area (in case it was empty before)
+    const emptyState = document.querySelector('.empty-state');
+    const chartContainer = document.querySelector('.chart-container');
+    if (emptyState) {
+      emptyState.style.display = 'none';
+    }
+    chartContainer.style.display = 'block';
+  }
+
+
+  socket.on('analytics-update', updateDashboard);
+
+  
+  // Handle connection events
+  socket.on('connect', () => {
+    console.log('Connected to server');
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Disconnected from server');
+  });
+
+  socket.on('error', (error) => {
+    console.error('Socket error:', error);
+  });
+</script>
+  
 </body>
 </html>

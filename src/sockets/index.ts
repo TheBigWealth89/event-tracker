@@ -22,20 +22,22 @@ export const initSocket = (httpServer: HTTPServer) => {
   });
 };
 
-//Create thr redis subscriber
 const subscriber = redisClient.duplicate();
 
 async function setupPubSub() {
-  await subscriber.subscribe("analytics-updates");
-  // Subscribe to the channel that your worker will publish to
-  subscriber.on("message", (message: string, channel: string) => {
+  subscriber.on("message", (channel, message) => {
     try {
-      logger.info(`Received analytics update from ${channel}`);
+      logger.info(`📨 Received message on ${channel}`);
       const parsed = JSON.parse(message);
+      logger.info("Successfully Received:", parsed);
       if (io) io.emit("analytics-update", parsed);
     } catch (err) {
       logger.error("Error handling analytics update:", err);
     }
   });
+
+  await subscriber.subscribe("analytics-update");
+  logger.info("✅ Subscribed to analytics-update");
 }
-setupPubSub();
+
+setupPubSub().catch(console.error);

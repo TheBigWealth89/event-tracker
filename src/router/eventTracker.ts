@@ -17,6 +17,8 @@ route.get("/", async (req, res) => {
       count: parseInt(count, 10),
     }));
 
+    logger.info("Events sending to ui", events);
+
     res.render("dashboard", { events });
   } catch (err) {
     logger.error("Failed to load dashboard:", err);
