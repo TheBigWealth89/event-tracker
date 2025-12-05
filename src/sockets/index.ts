@@ -4,7 +4,7 @@ import { Server as HTTPServer } from "http";
 import { redisClient } from "../db/connection";
 
 let io: Server | null = null;
-
+// Initialize Socket.io server
 export const initSocket = (httpServer: HTTPServer) => {
   io = new Server(httpServer, {
     cors: {
@@ -22,6 +22,7 @@ export const initSocket = (httpServer: HTTPServer) => {
   });
 };
 
+// Create a separate Redis client for subscribing to messages
 const subscriber = redisClient.duplicate();
 
 async function setupPubSub() {
@@ -35,7 +36,7 @@ async function setupPubSub() {
       logger.error("Error handling analytics update:", err);
     }
   });
-
+  // suscribe to the analytics-update channel
   await subscriber.subscribe("analytics-update");
   logger.info("✅ Subscribed to analytics-update");
 }

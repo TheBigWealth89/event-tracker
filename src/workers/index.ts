@@ -6,13 +6,14 @@ const STREAM_KEY = "events";
 const BOOKMARK_KEY = "analytics_worker:last_id";
 
 async function processEvents(lastReadId: string): Promise<string> {
+  // Track the ID of the last read event
   let nextReadId = lastReadId;
   try {
     const response = await redisClient.xread(
       "BLOCK",
       5000,
       "STREAMS",
-      STREAM_KEY,
+      STREAM_KEY, // stream name
       nextReadId // start ID
     );
 
@@ -30,6 +31,7 @@ async function processEvents(lastReadId: string): Promise<string> {
 
     logger.info(`Processing a batch of ${entries.length} events.`);
 
+    // AGGREGATION LOGIC
     const multi = redisClient.multi();
     for (const [, fields] of entries) {
       const eventData: Record<string, string> = {};
@@ -55,7 +57,7 @@ async function processEvents(lastReadId: string): Promise<string> {
 
     console.log("Updated Grand Totals in Redis:", grandTotals);
 
-    // WRITING TO POSTGRESQL
+    // WRITING TO POSTGRES TIMESCALEDB
     if (Object.keys(grandTotals).length > 0) {
       console.log("Writing aggregated totals to TimescaleDB...");
       try {
@@ -87,7 +89,7 @@ async function processEvents(lastReadId: string): Promise<string> {
   }
   return nextReadId;
 }
-
+// Start the worker loop
 async function startWorker() {
   await connectAll();
   logger.info(
