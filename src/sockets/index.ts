@@ -29,14 +29,14 @@ async function setupPubSub() {
   subscriber.on("message", (channel, message) => {
     try {
       logger.info(`📨 Received message on ${channel}`);
-      const parsed = JSON.parse(message);
+      const parsed = JSON.parse(message); // message receive
       logger.info("Successfully Received:", parsed);
-      if (io) io.emit("analytics-update", parsed);
+      if (io) io.emit("analytics-update", parsed); // emit the message to websocket
     } catch (err) {
       logger.error("Error handling analytics update:", err);
     }
   });
-  // suscribe to the analytics-update channel
+  // subscribe to the analytics-update channel
   await subscriber.subscribe("analytics-update");
   logger.info("✅ Subscribed to analytics-update");
 }

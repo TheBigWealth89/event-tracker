@@ -53,15 +53,16 @@ async function processEvents(lastReadId: string): Promise<string> {
     await redisClient.set(BOOKMARK_KEY, nextReadId);
 
     const grandTotals = await redisClient.hgetall(AGGREGATION_KEY);
-    redisClient.publish("analytics-update", JSON.stringify(grandTotals));
 
-    console.log("Updated Grand Totals in Redis:", grandTotals);
+    redisClient.publish("analytics-update", JSON.stringify(grandTotals)); // Published grantTotals to redis pub/sub
+
+    logger.info("Updated Grand Totals in Redis:", grandTotals);
 
     // WRITING TO POSTGRES TIMESCALEDB
     if (Object.keys(grandTotals).length > 0) {
       console.log("Writing aggregated totals to TimescaleDB...");
       try {
-        const values: (string | number)[] = [];
+        const values: (string | number)[] = []; 
         const valueStrings: string[] = [];
         let paramIndex = 1;
 
