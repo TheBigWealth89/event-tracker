@@ -9,7 +9,7 @@
     "build": "tsc",
     "test": "echo \"No tests yet\" && exit 0",
     "prepare": "husky",
-    "lint": "eslint . --ext .ts",
+    "lint": "eslint src/",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "typecheck": "tsc --noEmit"

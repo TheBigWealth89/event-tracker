@@ -3,6 +3,9 @@ import tseslint from "typescript-eslint";
 import eslint from "@eslint/js";
 
 export default tseslint.config(
+  {
+    ignores: ["dist/"],
+  },
 
   // Use ESLint's recommended built-in rules
   eslint.configs.recommended,
