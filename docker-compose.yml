@@ -1,48 +1,6 @@
 version: "3.8"
 
 services:
-  # Redis - Message Queue & Stream Storage
-  redis:
-    image: redis:7-alpine
-    container_name: event-tracker-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    networks:
-      - event-tracker-network
-
-  # PostgreSQL (TimescaleDB) - Analytics Database
-  postgres:
-    image: timescale/timescaledb:latest-pg17
-    container_name: event-tracker-postgres
-    environment:
-      POSTGRES_DB: ${DB_NAME:-analytics}
-      POSTGRES_USER: ${DB_USER:-eventuser}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-eventpass123}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./sql:/docker-entrypoint-initdb.d
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${DB_USER:-eventuser} -d ${DB_NAME:-analytics}",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - event-tracker-network
-
   # API Server - Handles HTTP requests
   api:
     build:
@@ -63,11 +21,6 @@ services:
       - "5000:5000"
     env_file:
       - .env
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
     command: ["node", "dist/index.js"]
     restart: unless-stopped
     networks:
@@ -93,21 +46,10 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-eventpass123}
     env_file:
       - .env
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
     command: ["node", "dist/workers/index.js"]
     restart: unless-stopped
     networks:
       - event-tracker-network
-
-volumes:
-  redis_data:
-    driver: local
-  postgres_data:
-    driver: local
 
 networks:
   event-tracker-network:
