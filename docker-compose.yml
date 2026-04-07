@@ -5,7 +5,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: src/router/Dockerfile
     container_name: event-tracker-api
     environment:
       NODE_ENV: production
@@ -32,7 +32,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile.worker
+      dockerfile: src/workers/Dockerfile
     container_name: event-tracker-worker
     environment:
       NODE_ENV: production
