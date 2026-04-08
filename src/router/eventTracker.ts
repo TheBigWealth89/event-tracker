@@ -46,6 +46,7 @@ route.post(
         "metadata",
         JSON.stringify(eventPayload.metadata ?? {})
       );
+      logger.info("Event tracked successfully", eventPayload);
       res.status(200).json({
         success: true,
         event: eventPayload,

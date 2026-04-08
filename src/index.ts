@@ -1,6 +1,6 @@
 import { createServer } from "http";
 import { initSocket } from "./sockets";
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { connectAll } from "./db/connection";
 import trackRouter from "./router/eventTracker";
 import { ZodError } from "zod";
@@ -27,7 +27,7 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use("/", trackRouter);
 
 // Error handling middleware must be registered after routes and have 4 args
-app.use((err: unknown, _req: Request, res: Response) => {
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ZodError) {
     const { fieldErrors } = err.flatten();
     return res.status(400).json({ errors: fieldErrors });
