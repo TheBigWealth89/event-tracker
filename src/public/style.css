@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesque:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesque:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap");
 
 :root {
   --bg-dark: #08080c;
@@ -9,8 +9,8 @@
   --accent-blue: #2d5bff;
   --text-main: #e0e0e6;
   --text-dim: #9494a3;
-  --font-main: 'Space Grotesque', sans-serif;
-  --font-mono: 'Space Mono', monospace;
+  --font-main: "Space Grotesque", sans-serif;
+  --font-mono: "Space Mono", monospace;
 }
 
 * {
@@ -22,9 +22,17 @@
 body {
   font-family: var(--font-main);
   background-color: var(--bg-dark);
-  background-image: 
-    radial-gradient(circle at 10% 20%, rgba(125, 64, 255, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(45, 91, 255, 0.05) 0%, transparent 40%);
+  background-image:
+    radial-gradient(
+      circle at 10% 20%,
+      rgba(125, 64, 255, 0.05) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 90% 80%,
+      rgba(45, 91, 255, 0.05) 0%,
+      transparent 40%
+    );
   min-height: 100vh;
   padding: 3rem 2rem;
   color: var(--text-main);
@@ -86,9 +94,18 @@ body {
 }
 
 @keyframes pulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 242, 255, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 255, 0); }
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(0, 242, 255, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 242, 255, 0);
+  }
 }
 
 .stats-grid {
@@ -117,7 +134,11 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(circle at 50% 120%, rgba(255, 255, 255, 0.05), transparent 70%);
+  background: radial-gradient(
+    circle at 50% 120%,
+    rgba(255, 255, 255, 0.05),
+    transparent 70%
+  );
   pointer-events: none;
 }
 
@@ -148,8 +169,12 @@ body {
   gap: 0.5rem;
 }
 
-.stat-card:nth-child(1) .stat-value { color: var(--accent-cyan); }
-.stat-card:nth-child(3) .stat-value { color: var(--accent-purple); }
+.stat-card:nth-child(1) .stat-value {
+  color: var(--accent-cyan);
+}
+.stat-card:nth-child(3) .stat-value {
+  color: var(--accent-purple);
+}
 
 .stat-label {
   font-size: 0.9rem;

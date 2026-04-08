@@ -27,6 +27,7 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use("/", trackRouter);
 
 // Error handling middleware must be registered after routes and have 4 args
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ZodError) {
     const { fieldErrors } = err.flatten();
