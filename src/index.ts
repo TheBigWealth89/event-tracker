@@ -42,9 +42,9 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   try {
     await connectAll();
 
-    httpServer.listen(PORT, () => {
+    httpServer.listen(PORT, "0.0.0.0", () => {
       logger.info(
-        `🚀 Server with Socket.IO is running on http://localhost:${PORT}`
+        `🚀 Server with Socket.IO is running on http://0.0.0.0:${PORT}`
       );
     });
   } catch (err) {
