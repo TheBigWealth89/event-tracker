@@ -119,7 +119,7 @@ async function startWorker() {
 function handleShutdown(signal: string) {
   logger.info(`Received ${signal}. Initiating graceful shutdown...`);
   isShuttingDown = true;
-  
+
   // Failsafe in case processEvents is stuck indefinitely
   setTimeout(() => {
     logger.error("Graceful shutdown timed out after 10s. Forcing exit.");
