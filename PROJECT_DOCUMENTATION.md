@@ -280,16 +280,16 @@ socket.on('analytics-update', updateDashboard);
 
 ### Step 10 — Worker writes to TimescaleDB
 
-After publishing, the worker also persists aggregated totals to PostgreSQL:
+After publishing, the worker also persists aggregated totals to PostgreSQL, snapping them to **1-minute intervals**:
 
 ```sql
 INSERT INTO event_counts (bucket, event_name, count)
-VALUES (NOW(), $1, $2), ...
+VALUES (time_bucket('1 minute', NOW()), $1, $2), ...
 ON CONFLICT (bucket, event_name) DO UPDATE
 SET count = event_counts.count + EXCLUDED.count;
 ```
 
-This creates a time-series record letting you query "how many page_view events happened at this point in time."
+This creates a time-series record. By using `time_bucket`, multiple worker batches within the same minute are automatically aggregated into a single row, optimizing storage and query performance.
 
 ### Step 11 — Dashboard initial render
 
@@ -397,6 +397,13 @@ tls: redisUrl.startsWith("rediss://") ? { rejectUnauthorized: false } : undefine
 1. The `validate(trackEventSchema)` middleware runs first (validation gate).
 2. Writes the event to the `"events"` Redis Stream using `xadd`.
 3. Returns `200 { success: true, event: {...} }`.
+
+#### `GET /analytics`
+
+1.  Accepts a `range` query parameter (e.g., `1h`, `6h`, `24h`, `7d`). Defaults to `1h`.
+2.  Maps the shorthand to a PostgreSQL `INTERVAL`.
+3.  Queries TimescaleDB using `time_bucket('1 minute', bucket)` to return historical trends.
+4.  Returns JSON data for charts or historical analysis.
 
 **Redis Stream entry format:**
 ```
@@ -607,14 +614,14 @@ CREATE TABLE event_counts (
 SELECT create_hypertable('event_counts', 'bucket');
 ```
 
-- **`bucket`** — timestamp of when the worker wrote the batch (set to `NOW()`). This is the time-series partition key.
+- **`bucket`** — timestamp of when the worker wrote the batch. Snapped to **1-minute intervals** using `time_bucket`.
 - **`event_name`** — the event type string (e.g. `"page_view"`, `"click"`).
 - **`count`** — the running total at that point in time.
 - **TimescaleDB hypertable** — automatically partitions the table into time-based chunks for efficient time-range queries and data retention policies.
 - **`ON CONFLICT ... DO UPDATE`** — if the same `(bucket, event_name)` pair is written twice, counts are **added** not replaced.
 
-> [!NOTE]
-> The worker currently calls `NOW()` on every batch write, meaning each batch creates a new row (or appends to an existing row if the timestamp collides to the same microsecond). For clean historical analytics, consider **time-bucketing** with `time_bucket('1 minute', NOW())`.
+> [!IMPORTANT]
+> **Storage Strategy:** The worker uses `time_bucket('1 minute', NOW())` on every batch write. This means all activity within a single clock minute for a specific event type is rolled up into one row. This significantly reduces row count (from ~thousands/day to 1,440/day per event type) and makes historical trend analysis much faster.
 
 ---
 

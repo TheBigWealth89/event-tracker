@@ -68,7 +68,7 @@ async function processEvents(lastReadId: string): Promise<string> {
         let paramIndex = 1;
 
         for (const [eventName, count] of Object.entries(grandTotals)) {
-          valueStrings.push(`(NOW(), $${paramIndex}, $${paramIndex + 1})`);
+          valueStrings.push(`(time_bucket('1 minute', NOW()), $${paramIndex}, $${paramIndex + 1})`);
           values.push(eventName, count);
           paramIndex += 2;
         }

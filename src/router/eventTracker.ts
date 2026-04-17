@@ -1,12 +1,13 @@
 import express, { Request, Response } from "express";
 import { validate } from "../middleware/validation.middleware";
 import { trackEventSchema, TrackEventInput } from "../schema/eventSchema";
-import { redisClient } from "../db/connection";
+import { redisClient, pool } from "../db/connection";
 import logger from "../utils/logger";
 
 const route = express.Router();
 // Redis key for aggregated event counts
 const AGGREGATION_KEY = "analytics:event_counts";
+
 route.get("/dashboard", async (req, res) => {
   try {
     // Fetch aggregated event counts from Redis
@@ -24,6 +25,48 @@ route.get("/dashboard", async (req, res) => {
   } catch (err) {
     logger.error("Failed to load dashboard:", err);
     res.status(500).send("Error loading dashboard.");
+  }
+});
+
+/**
+ * GET /analytics?range=1h
+ * Fetches historical event trends from TimescaleDB
+ */
+route.get("/analytics", async (req: Request, res: Response) => {
+  try {
+    const range = (req.query.range as string) || "1h";
+    
+    // Simple mapping of shorthand ranges to SQL intervals
+    const intervalMap: Record<string, string> = {
+      "1h": "1 hour",
+      "6h": "6 hours",
+      "24h": "24 hours",
+      "7d": "7 days",
+    };
+
+    const sqlInterval = intervalMap[range] || "1 hour";
+
+    const query = `
+      SELECT 
+        time_bucket('1 minute', bucket) AS interval, 
+        event_name, 
+        SUM(count) as count
+      FROM event_counts
+      WHERE bucket > NOW() - $1::interval
+      GROUP BY interval, event_name
+      ORDER BY interval DESC, event_name;
+    `;
+
+    const result = await pool.query(query, [sqlInterval]);
+
+    res.status(200).json({
+      success: true,
+      range,
+      data: result.rows
+    });
+  } catch (err) {
+    logger.error("Failed to fetch analytics:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
 
