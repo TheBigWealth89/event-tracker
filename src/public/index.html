@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Tracker Dashboard</title>
+  <meta name="description" content="Real-time event monitoring and analytics dashboard">
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body>
+  <div class="container">
+
+    <!-- 1. HEADER: Title + subtitle at the very top -->
+    <div class="header">
+      <div class="header-content">
+        <h1>Event Tracker</h1>
+        <div class="header-subtitle">
+          <p>Real-time event monitoring and analytics</p>
+          <div class="live-indicator">
+            <div class="live-dot"></div>
+            Live Monitoring
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. STATS CARDS: Four metric cards -->
+    <div class="stats-grid" id="stats-grid" style="display: none;">
+      <div class="stat-card">
+        <h3>Total Aggregation</h3>
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-label">Total processed events</div>
+      </div>
+
+      <div class="stat-card">
+        <h3>Event Types</h3>
+        <div class="stat-value" id="stat-types">0</div>
+        <div class="stat-label">Unique event streams</div>
+      </div>
+
+      <div class="stat-card">
+        <h3>Top Event</h3>
+        <div class="stat-value top-event-name" id="stat-top-event">-</div>
+        <div class="stat-label" id="stat-top-event-label">0 total hits</div>
+      </div>
+
+      <div class="stat-card">
+        <h3>Avg Count</h3>
+        <div class="stat-value" id="stat-avg">0</div>
+        <div class="stat-label">Average per event type</div>
+      </div>
+    </div>
+
+    <!-- 3. EVENT DISTRIBUTION: List of all events -->
+    <div class="chart-container" id="chart-container" style="display: none;">
+      <div class="chart-header">
+        <h2>Event Distribution</h2>
+        <button class="refresh-btn" id="reload-btn" onclick="location.reload()">↺ Reload</button>
+      </div>
+
+      <div class="event-list" id="event-list">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Empty state when no events -->
+    <div class="chart-container" id="empty-state" style="display: flex;">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 11l3 3L22 4"></path>
+          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+        </svg>
+        <h3>No Events Yet</h3>
+        <p>Start tracking events to see live activity here.</p>
+      </div>
+    </div>
+
+  </div><!-- /.container -->
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/dashboard.js"></script>
+
+</body>
+
+</html>

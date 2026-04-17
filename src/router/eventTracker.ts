@@ -8,25 +8,26 @@ const route = express.Router();
 // Redis key for aggregated event counts
 const AGGREGATION_KEY = "analytics:event_counts";
 
-route.get("/dashboard", async (req, res) => {
+import path from "path";
+
+route.get("/dashboard", (req, res) => {
+  res.sendFile(path.join(__dirname, "../public/index.html"));
+});
+
+/**
+ * GET /api/stats
+ * Fetches current aggregated event counts from Redis
+ */
+route.get("/api/stats", async (req, res) => {
   try {
-    // Fetch aggregated event counts from Redis
     const eventCounts = await redisClient.hgetall(AGGREGATION_KEY);
-
-    // Convert the flat object from Redis into an array of objects for EJS
-    const events = Object.entries(eventCounts).map(([eventName, count]) => ({
-      name: eventName,
-      count: parseInt(count, 10),
-    }));
-
-    logger.info("Events sending to ui", events);
-
-    res.render("dashboard", { events }); // Render the EJS template with event data
+    res.status(200).json({ success: true, data: eventCounts });
   } catch (err) {
-    logger.error("Failed to load dashboard:", err);
-    res.status(500).send("Error loading dashboard.");
+    logger.error("Failed to load stats:", err);
+    res.status(500).json({ success: false, message: "Error loading stats." });
   }
 });
+
 
 /**
  * GET /analytics?range=1h

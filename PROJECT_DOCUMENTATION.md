@@ -20,8 +20,8 @@
    - [Worker — `src/workers/index.ts`](#57-worker--srcworkersindexts)
    - [Sockets — `src/sockets/index.ts`](#58-sockets--srcsocketsindexts)
    - [Logger — `src/utils/logger.ts`](#59-logger--srcutilsloggerts)
-   - [Dashboard — `src/views/dashboard.ejs`](#510-dashboard--srcviewsdashboardejs)
-   - [Styles — `src/public/style.css`](#511-styles--srcpublicstylecss)
+   - [Dashboard UI — `src/public/index.html`](#510-dashboard-ui--srcpublicindexhtml)
+   - [Dashboard Logic — `src/public/js/dashboard.js`](#511-dashboard-logic--srcpublicjsdashboardjs)
 6. [Database Schema — `sql/init.sql`](#6-database-schema--sqlinitsql)
 7. [Docker & Containerization](#7-docker--containerization)
 8. [CI/CD — GitHub Actions](#8-cicd--github-actions)
@@ -40,7 +40,7 @@
 2. **Buffer** those events in a **Redis Stream** — a durable, ordered log.
 3. **Process** the stream in a background **Worker** that aggregates counts and persists them to **TimescaleDB** (PostgreSQL with time-series extensions).
 4. **Broadcast** live updates to connected browsers via **Socket.IO** using Redis Pub/Sub.
-5. **Display** the live aggregated counts on a server-side-rendered **dashboard** (`GET /dashboard`).
+5. **Display** the live aggregated counts on a client-side rendered **dashboard** (`GET /dashboard`).
 
 The system is split into two independent processes:
 
@@ -139,11 +139,11 @@ event-tracker/
 │   ├── utils/
 │   │   └── logger.ts             # Winston logger (console + file transports)
 │   │
-│   ├── views/
-│   │   └── dashboard.ejs         # Server-side EJS dashboard template
-│   │
-│   └── public/
-│       └── style.css             # Dashboard CSS (dark/glassmorphism theme)
+│   ├── public/
+│   │   ├── index.html            # Static HTML dashboard UI
+│   │   ├── style.css             # Dashboard CSS (dark/glassmorphism theme)
+│   │   └── js/
+│   │       └── dashboard.js      # Client-side render + Socket.IO logic
 │
 ├── sql/
 │   └── init.sql                  # TimescaleDB table creation + hypertable setup
@@ -293,14 +293,12 @@ This creates a time-series record. By using `time_bucket`, multiple worker batch
 
 ### Step 11 — Dashboard initial render
 
-When someone navigates to `GET /dashboard`, the route handler fetches the current aggregation from Redis:
+When someone navigates to `GET /dashboard`, the server responds with a static `index.html` file. 
 
-```ts
-const eventCounts = await redisClient.hgetall("analytics:event_counts");
-res.render("dashboard", { events });
-```
-
-The EJS template renders the stats server-side. Socket.IO then keeps it live going forward.
+The client-side JavaScript (`dashboard.js`) then:
+1. Calls `GET /api/stats` to fetch the current aggregation from Redis as JSON.
+2. Renders the UI immediately based on that initial data.
+3. Allows Socket.IO to receive live updates from there.
 
 ---
 
@@ -320,11 +318,10 @@ initSocket()     (attaches Socket.IO to the HTTP server)
 Express middleware stack:
   express.json()
   express.static()  (serves /public)
-  EJS view engine   (serves /views)
     ↓
 Routes:
   GET  /health     → 200 OK (for Docker healthcheck)
-  use  /           → trackRouter (handles /track and /dashboard)
+  use  /           → trackRouter (handles /track, /dashboard, and /api/stats)
     ↓
 Global error handler (ZodError → 400, other → 500)
     ↓
@@ -388,9 +385,12 @@ tls: redisUrl.startsWith("rediss://") ? { rejectUnauthorized: false } : undefine
 
 #### `GET /dashboard`
 
+Serves the static `index.html` file containing the analytics UI.
+
+#### `GET /api/stats`
+
 1. Reads the `analytics:event_counts` hash from Redis (`hgetall`).
-2. Converts it to `[{ name, count }]` array.
-3. Renders `views/dashboard.ejs` with the array.
+2. Returns a JSON object with the current aggregate counts. This handles the client-side's initial state fetch.
 
 #### `POST /track`
 
@@ -545,24 +545,26 @@ In **production**, console output is suppressed to avoid noise in container logs
 
 ---
 
-### 5.10 Dashboard — `src/views/dashboard.ejs`
+### 5.10 Dashboard UI — `src/public/index.html`
 
-**What it does:** The server-rendered HTML page for the analytics dashboard.
-
-**Two-phase rendering:**
-
-1. **Server side (EJS, at request time):** The route handler passes `events = [{name, count}]`. EJS computes `totalEvents`, `topEvent`, `avgEvents` and renders the stat cards and event list into the HTML response.
-
-2. **Client side (JavaScript + Socket.IO, real-time):** After the page loads, `socket.on('analytics-update', updateDashboard)` receives live updates and rewrites the DOM without a page reload.
+**What it does:** The static HTML page for the analytics dashboard.
 
 **UI sections:**
 - **Header** — Title, subtitle, animated "Live Monitoring" pill with pulsing dot.
 - **Stats Grid** — 4 cards: Total Aggregation, Event Types, Top Event, Avg Count.
-- **Event Distribution** — A responsive grid of event cards (sorted by count descending), each showing the event name and count.
+- **Event Distribution** — A responsive grid of event cards (sorted by count descending).
 - **Empty State** — Shown when no events exist yet.
 
-**`updateDashboard(eventCounts)` client function:**
-Receives the raw Redis hash as `{ eventName: count }`, transforms it to the same `[{name, count}]` format used server-side, and updates all DOM elements in place.
+### 5.11 Dashboard Logic — `src/public/js/dashboard.js`
+
+**What it does:** Provides the Client-Side Rendering (CSR) and Socket.IO real-time binding.
+
+**Data Flow:**
+1. **Initial load:** Fetches JSON data from `/api/stats` and runs an initial `updateDashboard()` to construct the UI.
+2. **Real-time updates:** Listens to `socket.on('analytics-update', updateDashboard)` to refresh the numbers and list live.
+
+**`updateDashboard(eventCounts)`**:
+Receives the raw Redis hash (either from HTTP or Socket), processes it into an array to determine the top event and averages, and directly updates the DOM using Vanilla JavaScript. Handles swapping the Empty State view to the Grid View.
 
 ---
 
@@ -656,7 +658,6 @@ node:20-alpine
 node:20-alpine
   → npm ci --only=production (no devDeps)
   → COPY dist/ from builder
-  → (API only) COPY src/views → dist/views
   → (API only) COPY src/public → dist/public
   → Run as non-root user nodejs:1001
   → EXPOSE 5000 (API only)
@@ -664,7 +665,7 @@ node:20-alpine
 ```
 
 > [!NOTE]
-> TypeScript compiler (`tsc`) **does not** copy non-`.ts` files. That's why the `.ejs` view templates and `.css` stylesheet are explicitly copied from the builder stage in the API Dockerfile.
+> TypeScript compiler (`tsc`) **does not** copy non-`.ts` files. That's why the `.html`, `.js`, and `.css` static assets are explicitly copied from the builder stage in the API Dockerfile.
 
 ---
 
@@ -761,7 +762,6 @@ src/workers/index.ts
 | `ioredis` | ^5.7.0 | Redis client (streams, pub/sub, hashes) |
 | `pg` | ^8.16.3 | PostgreSQL client (TimescaleDB) |
 | `zod` | ^4.1.9 | Schema validation + TypeScript inference |
-| `ejs` | ^3.1.10 | Server-side HTML templating |
 | `dotenv` | ^17.2.3 | `.env` file loader |
 | `winston` | (via @types/winston) | Structured logging |
 

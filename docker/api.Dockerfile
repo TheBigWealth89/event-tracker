@@ -30,8 +30,7 @@ RUN npm ci --only=production --ignore-scripts
 # Copy compiled JavaScript from builder stage
 COPY --from=builder /app/dist ./dist
 
-# Copy static assets and views (tsc doesn't copy these)
-COPY --from=builder /app/src/views ./dist/views
+# Copy static assets (tsc doesn't copy these)
 COPY --from=builder /app/src/public ./dist/public
 
 # Create a non-root user
