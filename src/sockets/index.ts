@@ -42,3 +42,12 @@ async function setupPubSub() {
 }
 
 setupPubSub().catch(console.error);
+
+export const closeSocket = async () => {
+  if (io) {
+    logger.info("Closing Socket.IO server...");
+    io.close();
+  }
+  logger.info("Closing Redis subscriber...");
+  await subscriber.quit();
+};

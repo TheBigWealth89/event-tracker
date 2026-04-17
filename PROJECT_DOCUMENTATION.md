@@ -211,7 +211,7 @@ Redis Streams work like an append-only log. Each entry gets a unique monotonic I
 
 ### Step 4 — Worker reads the stream (blocking poll)
 
-The Worker process (`workers/index.ts`) runs an infinite `while(true)` loop. On each iteration it calls:
+The Worker process (`workers/index.ts`) runs a controlled `while(!isShuttingDown)` loop. On each iteration it calls:
 
 ```ts
 redisClient.xread("BLOCK", 5000, "STREAMS", "events", lastReadId)
@@ -243,6 +243,9 @@ await redisClient.set("analytics_worker:last_id", lastEntryId);
 ```
 
 On worker restart, it reads this key to resume exactly where it left off — **no events are lost or re-processed**.
+
+> [!TIP]
+> **Graceful Shutdown Integration:** By using a shutdown handler, we ensure the worker *never* stops halfway through Step 6. It always finishes the current batch and saves the bookmark before exiting, preventing duplicate processing on restart.
 
 ### Step 7 — Worker publishes updated totals via Pub/Sub
 
@@ -331,6 +334,12 @@ httpServer.listen(PORT, "0.0.0.0")
 ```
 
 **Key design note:** The server only starts listening **after** `connectAll()` resolves. If either database connection fails at startup, the process exits with code `1` rather than serving traffic against broken connections.
+
+**Graceful Shutdown:** The API server implements a shutdown handler for `SIGTERM` and `SIGINT` signals.
+1.  **Stop HTTP**: Calls `httpServer.close()` to stop accepting new requests while allowing current ones to finish.
+2.  **Cleanup Sockets**: Calls `closeSocket()` to shut down Socket.IO and its Redis subscriber.
+3.  **Close Shared DBs**: Quits the main `redisClient` and ends the PostgreSQL `pool`.
+4.  **Failsafe**: A 10-second timeout ensures the process exits even if cleanup hangs.
 
 ---
 
@@ -453,7 +462,7 @@ This is a **higher-order function** pattern — `validate` is called at route-re
 startWorker()
   └── connectAll()                   → ensures DB connections exist
   └── GET analytics_worker:last_id  → resume from last position (or "0-0")
-  └── while(true):
+  └── while(!isShuttingDown):       → controlled loop (SIGTERM/SIGINT)
         processEvents(lastReadId)
           └── XREAD BLOCK 5000 ...  → wait up to 5s for new events
           └── MULTI / HINCRBY ...   → atomic batch aggregation in Redis
@@ -462,12 +471,17 @@ startWorker()
           └── HGETALL analytics:event_counts
           └── PUBLISH analytics-update <json>
           └── INSERT INTO event_counts ... (Postgres upsert)
+  └── Close Redis & Postgres connections
+  └── process.exit(0)
 ```
 
 **Fault tolerance:**
 - The `BLOCK 5000` call prevents CPU spin loops when the stream is empty.  
 - The bookmark ensures **at-least-once processing** — a worker crash leaves the bookmark at the last successfully persisted ID, so on restart only unprocessed entries are re-read.
 - Postgres write errors are caught and logged but do **not** crash the loop — the Redis aggregation is still valid.
+
+**Graceful Shutdown:**
+The worker uses an `isShuttingDown` flag and `SIGTERM`/`SIGINT` listeners. Because the flag is checked at the start of the `while` loop, the worker will always finish its **current batch** (including saving the bookmark to Redis and writing to Postgres) before exiting. This prevents duplicate processing of events that would otherwise occur if the process were killed mid-batch.
 
 ---
 
@@ -495,6 +509,11 @@ Browser              socket.on("analytics-update", updateDashboard)
 ```
 
 CORS is configured to `origin: "*"` — appropriate for a dev/demo setup, should be locked down in production.
+
+**Cleanup Handler:**
+Exports a `closeSocket()` async function that:
+1.  Calls `io.close()` to disconnect clients and stop the server.
+2.  Calls `subscriber.quit()` to cleanly close the dedicated Redis subscription client.
 
 ---
 

@@ -1,7 +1,7 @@
 import { createServer } from "http";
-import { initSocket } from "./sockets";
+import { initSocket, closeSocket } from "./sockets";
 import express, { Request, Response, NextFunction } from "express";
-import { connectAll } from "./db/connection";
+import { connectAll, pool, redisClient } from "./db/connection";
 import trackRouter from "./router/eventTracker";
 import { ZodError } from "zod";
 import logger from "./utils/logger";
@@ -37,6 +37,52 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   logger.error("Unhandled error:", err instanceof Error ? err.message : err);
   res.status(500).json({ message: "Internal server error" });
 });
+
+let isShuttingDown = false;
+
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  logger.info(`Received ${signal}. Starting graceful shutdown...`);
+
+  // 1. Stop accepting new HTTP requests
+  httpServer.close(async (err) => {
+    if (err) {
+      logger.error("Error closing HTTP server:", err);
+      process.exit(1);
+    }
+    logger.info("HTTP server closed.");
+
+    try {
+      // 2. Close Sockets and their Redis subscriber
+      await closeSocket();
+
+      // 3. Close Shared Redis client
+      logger.info("Closing main Redis client...");
+      await redisClient.quit();
+
+      // 4. Close Postgres Pool
+      logger.info("Closing PostgreSQL pool...");
+      await pool.end();
+
+      logger.info("Graceful shutdown complete. Exiting.");
+      process.exit(0);
+    } catch (error) {
+      logger.error("Error during graceful shutdown:", error);
+      process.exit(1);
+    }
+  });
+
+  // Failsafe: force exit after 10 seconds
+  setTimeout(() => {
+    logger.error("Graceful shutdown timed out. Forcing exit.");
+    process.exit(1);
+  }, 10000).unref();
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 (async () => {
   try {
