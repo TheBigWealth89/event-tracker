@@ -35,7 +35,7 @@ route.get("/dashboard", async (req, res) => {
 route.get("/analytics", async (req: Request, res: Response) => {
   try {
     const range = (req.query.range as string) || "1h";
-    
+
     // Simple mapping of shorthand ranges to SQL intervals
     const intervalMap: Record<string, string> = {
       "1h": "1 hour",
@@ -62,7 +62,7 @@ route.get("/analytics", async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       range,
-      data: result.rows
+      data: result.rows,
     });
   } catch (err) {
     logger.error("Failed to fetch analytics:", err);
