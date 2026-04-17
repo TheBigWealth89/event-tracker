@@ -91,6 +91,8 @@ async function processEvents(lastReadId: string): Promise<string> {
   }
   return nextReadId;
 }
+let isShuttingDown = false;
+
 // Start the worker loop
 async function startWorker() {
   await connectAll();
@@ -102,10 +104,30 @@ async function startWorker() {
   let lastReadId = (await redisClient.get(BOOKMARK_KEY)) || "0-0";
   logger.info(`Starting stream from last known ID: ${lastReadId}`);
 
-  while (true) {
+  while (!isShuttingDown) {
     // Pass the current bookmark in, get the next one back.
     lastReadId = await processEvents(lastReadId);
   }
+
+  logger.info("Worker loop exited. Closing connections...");
+  await redisClient.quit();
+  await pool.end();
+  logger.info("Graceful shutdown complete.");
+  process.exit(0);
 }
+
+function handleShutdown(signal: string) {
+  logger.info(`Received ${signal}. Initiating graceful shutdown...`);
+  isShuttingDown = true;
+  
+  // Failsafe in case processEvents is stuck indefinitely
+  setTimeout(() => {
+    logger.error("Graceful shutdown timed out after 10s. Forcing exit.");
+    process.exit(1);
+  }, 10000).unref();
+}
+
+process.on("SIGTERM", () => handleShutdown("SIGTERM"));
+process.on("SIGINT", () => handleShutdown("SIGINT"));
 
 startWorker();

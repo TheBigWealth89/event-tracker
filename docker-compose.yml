@@ -4,7 +4,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: src/router/Dockerfile
+      dockerfile: docker/api.Dockerfile
     container_name: event-tracker-api
     environment:
       NODE_ENV: production
@@ -26,12 +26,12 @@ services:
     # Only for development
     # volumes:
     #   - ./src:/app/src
-
+    
   # Worker - Processes events from Redis stream
   worker:
     build:
       context: .
-      dockerfile: src/workers/Dockerfile
+      dockerfile: docker/worker.Dockerfile
     container_name: event-tracker-worker
     environment:
       NODE_ENV: production
