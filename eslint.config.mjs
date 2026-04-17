@@ -25,5 +25,19 @@ export default tseslint.config(
       //  Custom rules here, for example:
 
     },
+  },
+
+  // Configuration for client-side JavaScript files
+  {
+    files: ["src/public/**/*.js"],
+    languageOptions: {
+      globals: {
+        ...globals.browser, // Use standard Browser global variables
+        io: "readonly", // Specific global for Socket.io
+      },
+    },
+    rules: {
+      // Overrides for browser JS if needed
+    },
   }
 );

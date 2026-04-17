@@ -28,7 +28,6 @@ route.get("/api/stats", async (req, res) => {
   }
 });
 
-
 /**
  * GET /analytics?range=1h
  * Fetches historical event trends from TimescaleDB
