@@ -526,22 +526,22 @@ Exports a `closeSocket()` async function that:
 
 ### 5.9 Logger — `src/utils/logger.ts`
 
-**What it does:** Provides a structured **Winston** logger used everywhere in the codebase.
+**What it does:** Provides a structured, production-ready **Winston** logger that balances visibility with security.
+
+- **Unified Stream**: All logs are directed to **stdout/stderr**, allowing Docker to capture and manage the stream.
+- **Environment-Specific Formatting**:
+  - **Production**: Uses **JSON** format, which is easier for cloud log managers (like AWS CloudWatch or Loki) to parse and index.
+  - **Development**: Uses a **Colorized**, human-readable format for better local debugging.
+- **Security & Redaction**: 
+  - **PII Redaction**: A custom formatter automatically masks sensitive keys (e.g., `password`, `token`, `authorization`) with `[REDACTED]`.
+  - **URL Redaction**: Automatically detects and masks passwords within connection strings (e.g., `redis://user:[REDACTED]@host`).
+  - **Always On**: Redaction is active in **both** Development and Production to prevent accidental leaks.
+- **Dynamic Level**: Verbosity can be controlled via the `LOG_LEVEL` environment variable (defaults to `info`).
 
 **Log levels (custom priority order):**
 ```
 error (0) → warn (1) → info (2) → http (3) → debug (4)
 ```
-
-**Transports configured:**
-
-| Transport | Level | Format | Always active? |
-|---|---|---|---|
-| `error.log` file | `error` only | JSON | ✅ Yes |
-| `combined.log` file | all levels | JSON | ✅ Yes |
-| Console | `debug` (all) | Colorized + timestamp | ❌ Dev only |
-
-In **production**, console output is suppressed to avoid noise in container logs while still writing to files. Log files are written to `logs/` at the project root.
 
 ---
 
@@ -637,6 +637,22 @@ SELECT create_hypertable('event_counts', 'bucket');
 | `worker` | `event-tracker-worker` | `docker/worker.Dockerfile` | none | `node dist/workers/index.js` |
 
 Both services are on the shared bridge network `event-tracker-network`.
+
+### Production Safety & Log Rotation
+
+To prevent the production server from crashing due to disk exhaustion, both services are configured with a strict log rotation policy:
+
+```yaml
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+```
+
+- **Safety**: Logs are capped at **30MB** total (3 files x 10MB) per service.
+- **Persistence**: Logs are maintained even if the container restarts.
+- **Visibility**: You can watch live logs in production using `docker-compose logs -f`.
 
 > [!IMPORTANT]
 > Redis and PostgreSQL are **not** defined in `docker-compose.yml`. The project uses **external cloud-hosted** services (Render for Postgres, RedisCloud for Redis), with connection details provided via environment variables.

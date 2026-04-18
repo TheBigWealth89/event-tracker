@@ -1,69 +1,95 @@
 import winston from "winston";
 import { join } from "path";
 
-// Use Node.js globals for __filename and __dirname
+/**
+ * Professional Logging Configuration
+ * 
+ * - Development: Console (Colorized) + Local Files (logs/*.log).
+ * - Production: Console (Structured JSON) -> Docker Driver handle rotation.
+ * - Security: Automatic redaction of sensitive keys.
+ */
+
 const logDir: string = join(__dirname, "..", "..", "logs");
+const LOG_LEVEL = process.env.LOG_LEVEL || "info";
+const NODE_ENV = process.env.NODE_ENV || "development";
+const isProduction = NODE_ENV === "production";
 
-const levels: winston.config.AbstractConfigSetLevels = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  http: 3,
-  debug: 4,
-};
+// Keys that should NEVER be logged in plaintext
+const SENSITIVE_KEYS = ["password", "token", "secret", "authorization", "apikey", "cookie"];
 
-const colors: winston.config.AbstractConfigSetColors = {
-  error: "red",
-  warn: "yellow",
-  info: "green",
-  http: "magenta",
-  debug: "white",
-};
+/**
+ * Deep redaction of sensitive keys in log objects
+ */
+const redact = winston.format((info) => {
+  const result = { ...info };
+  
+  const mask = (obj: any) => {
+    if (!obj || typeof obj !== "object") return;
+    
+    Object.keys(obj).forEach((key) => {
+      const val = obj[key];
+      if (SENSITIVE_KEYS.includes(key.toLowerCase())) {
+        obj[key] = "[REDACTED]";
+      } else if (typeof val === "string") {
+        // Redact passwords in connection strings (e.g., redis://user:password@host)
+        // This regex looks for :password@ between the protocol and host
+        obj[key] = val.replace(/(:\/\/[^/]*?)([:])(.*?)(@[^@/]+(?:\/|$))/g, "$1$2[REDACTED]$4");
+      } else if (typeof val === "object") {
+        mask(val);
+      }
+    });
+  };
 
-winston.addColors(colors);
+  mask(result);
+  return result;
+});
 
-// This format is much better for the console
-const consoleFormat = winston.format.combine(
+/**
+ * Human-friendly format for development
+ */
+const devFormat = winston.format.combine(
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-  winston.format.colorize({ all: true }), // Colorize the entire log message
-  winston.format.printf(
-    (info) => `${info.timestamp} [${info.level}]: ${info.message}`
-  )
+  redact(),
+  winston.format.colorize(),
+  winston.format.printf(({ timestamp, level, message, ...meta }) => {
+    const metaStr = Object.keys(meta).length ? `\n${JSON.stringify(meta, null, 2)}` : "";
+    return `${timestamp} [${level}]: ${message}${metaStr}`;
+  })
 );
 
-// This format is better for files (JSON is standard)
-const fileFormat = winston.format.combine(
+/**
+ * Machine-readable format for Production
+ */
+const prodFormat = winston.format.combine(
   winston.format.timestamp(),
-  winston.format.json() // Log as JSON in files
+  redact(),
+  winston.format.json()
 );
 
 const transports: winston.transport[] = [
-  // Always log errors to a dedicated error file
-  new winston.transports.File({
-    filename: `${logDir}/error.log`,
-    level: "error",
-    format: fileFormat,
-  }),
-  // Log everything to a combined file
-  new winston.transports.File({
-    filename: `${logDir}/combined.log`,
-    format: fileFormat,
+  new winston.transports.Console({
+    stderrLevels: ["error"],
   }),
 ];
 
-// Only add the Console transport if we are NOT in production
-if (process.env.NODE_ENV !== "production") {
+// Add file logging ONLY in development
+if (!isProduction) {
   transports.push(
-    new winston.transports.Console({
-      level: "debug", // Log everything to the console in dev
-      format: consoleFormat,
+    new winston.transports.File({
+      filename: join(logDir, "error.log"),
+      level: "error",
+      format: prodFormat, // Store JSON in files even in dev
+    }),
+    new winston.transports.File({
+      filename: join(logDir, "combined.log"),
+      format: prodFormat,
     })
   );
 }
 
 const logger = winston.createLogger({
-  level: "info", // Default level if not specified in transport
-  levels,
+  level: LOG_LEVEL,
+  format: isProduction ? prodFormat : devFormat,
   transports,
 });
 

@@ -30,7 +30,8 @@ pool.on("connect", () => logger.info("PostgreSQL client acquired"));
 pool.on("error", (err) => logger.error("PostgreSQL pool error:", err));
 
 redisClient.on("connect", () =>
-  logger.info(`Redis connecting......... ${redisUrl}`)
+  // logger.info(`Redis connecting to ${redisClient.options.host}:${redisClient.options.port}`)
+  logger.info(`Redis connecting to............. ${redisUrl}`)
 );
 redisClient.on("ready", () => logger.info("Redis client ready"));
 redisClient.on("error", (err: Error) => logger.error("Redis error:", err));

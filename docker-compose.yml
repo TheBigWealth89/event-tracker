@@ -23,6 +23,11 @@ services:
     restart: unless-stopped
     networks:
       - event-tracker-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     # Only for development
     # volumes:
     #   - ./src:/app/src
@@ -47,6 +52,11 @@ services:
     restart: unless-stopped
     networks:
       - event-tracker-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   event-tracker-network:
