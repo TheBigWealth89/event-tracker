@@ -29,6 +29,7 @@
 10. [Environment Variables](#10-environment-variables)
 11. [Key Redis Concepts Used](#11-key-redis-concepts-used)
 12. [Dependency Map](#12-dependency-map)
+13. [Observability & Health Checks](#13-observability--health-checks)
 
 ---
 
@@ -137,7 +138,8 @@ event-tracker/
 │   │   └── index.ts              # Socket.IO init + Redis Pub/Sub subscriber
 │   │
 │   ├── utils/
-│   │   └── logger.ts             # Winston logger (console + file transports)
+│   │   ├── logger.ts             # Winston logger (console + file transports)
+│   │   └── metrics.ts            # Prometheus metrics builder (zero-dependency)
 │   │
 │   ├── public/
 │   │   ├── index.html            # Static HTML dashboard UI
@@ -320,7 +322,8 @@ Express middleware stack:
   express.static()  (serves /public)
     ↓
 Routes:
-  GET  /health     → 200 OK (for Docker healthcheck)
+  GET  /health     → Advanced 503-aware health check
+  GET  /metrics    → Prometheus telemetry exposition
   use  /           → trackRouter (handles /track, /dashboard, and /api/stats)
     ↓
 Global error handler (ZodError → 400, other → 500)
@@ -462,6 +465,8 @@ This is a **higher-order function** pattern — `validate` is called at route-re
 | `events` | Stream | The event log produced by the API |
 | `analytics:event_counts` | Hash | Running total per event name |
 | `analytics_worker:last_id` | String | Bookmark — last processed stream entry ID |
+| `worker:last_processed_at` | String | ISO Timestamp of last successful batch |
+| `worker:events_processed_total`| String | Global counter of events handled by worker |
 
 **The main loop:**
 
@@ -518,7 +523,7 @@ Browser              socket.on("analytics-update", updateDashboard)
 CORS is configured to `origin: "*"` — appropriate for a dev/demo setup, should be locked down in production.
 
 **Cleanup Handler:**
-Exports a `closeSocket()` async function that:
+ Exports a `closeSocket()` async function that:
 1.  Calls `io.close()` to disconnect clients and stop the server.
 2.  Calls `subscriber.quit()` to cleanly close the dedicated Redis subscription client.
 
@@ -763,11 +768,49 @@ src/index.ts
   ├── src/sockets/index.ts
   │     └── src/db/connection.ts
   └── src/utils/logger.ts            → winston
+  └── src/utils/metrics.ts           → (zero-dependency)
 
 src/workers/index.ts
   ├── src/db/connection.ts
   └── src/utils/logger.ts
 ```
+
+---
+
+## 13. Observability & Health Checks
+
+The system includes built-in observability to monitor system health and performance without external dependencies.
+
+### 13.1 Advanced `/health` Endpoint
+
+Located at `GET /health`, this endpoint provides a deep inspection of the system state:
+
+- **Postgres Check**: Actively pings the database and reports latency in `ms`.
+- **Redis Check**: Pings the Redis instance and reports the current stream length.
+- **Worker Check**: Reads the worker's "heartbeat" from Redis to report exactly when it last processed a batch.
+- **Resource Usage**: Reports system uptime and memory (RSS and Heap) in MB.
+
+**Threshold-based failure:**
+The endpoint returns **HTTP 503 (Service Unavailable)** instead of 200 if:
+1. Postgres is unreachable.
+2. Redis is unreachable.
+3. **Worker Lag > 40 seconds** AND the Redis stream contains unprocessed events.
+
+This prevents the system from reporting "OK" when the background processing is silently stalled.
+
+### 13.2 `/metrics` Endpoint (Prometheus)
+
+Exposes real-time telemetry at `GET /metrics` in the **Prometheus text exposition format (v0.0.4)**.
+
+| Metric | Type | Description |
+|---|---|---|
+| `event_tracker_uptime_seconds` | Gauge | How long the API process has been running. |
+| `event_tracker_memory_heap_used_bytes` | Gauge | Current heap memory consumption. |
+| `event_tracker_redis_stream_length` | Gauge | Buffer size (backlog) in Redis. |
+| `event_tracker_worker_lag_seconds` | Gauge | Time since worker last finished a batch. |
+| `event_tracker_worker_events_processed_total`| Counter | Cumulative total of events consumed from the stream. |
+
+**Zero-dependency implementation**: To keep the production image small and fast, these metrics are constructed manually in `src/utils/metrics.ts` rather than using a heavy client library.
 
 **Production dependencies:**
 
