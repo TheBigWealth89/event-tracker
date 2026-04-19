@@ -52,6 +52,10 @@ async function processEvents(lastReadId: string): Promise<string> {
     // Save the bookmark back to Redis.
     await redisClient.set(BOOKMARK_KEY, nextReadId);
 
+    // Save worker state for metrics
+    await redisClient.set("worker:last_processed_at", new Date().toISOString());
+    await redisClient.incrby("worker:events_processed_total", entries.length);
+
     const grandTotals = await redisClient.hgetall(AGGREGATION_KEY);
 
     // Published grantTotals to redis pub/sub

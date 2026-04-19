@@ -45,7 +45,8 @@ export async function connectAll(): Promise<void> {
   try {
     logger.info("🚀 Initializing all connections...");
 
-    await pool.connect();
+    const client = await pool.connect();
+    client.release();
     logger.info("✅ PostgreSQL connected.");
 
     //Checking status because ioredis connects automatically
