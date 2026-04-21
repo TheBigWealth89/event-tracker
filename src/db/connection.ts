@@ -13,6 +13,11 @@ export const pool = new Pool({
   database: process.env.DB_NAME,
   port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
   ssl: sslConfig,
+  // --- Pool Performance Tuning ---
+  max: 10,
+  min: 2,
+  idleTimeoutMillis: 60000,
+  connectionTimeoutMillis: 5000,
 });
 // --- Redis Connection ---
 const redisUrl: string = process.env.REDIS_URL || "";
