@@ -58,7 +58,10 @@ app.get("/health", async (_req: Request, res: Response) => {
     const heartbeatStr = await redisClient.get("worker:heartbeat");
     if (heartbeatStr) {
       const lastHeartbeat = new Date(heartbeatStr).getTime();
-      workerHeartbeatLagSeconds = Math.max(0, (Date.now() - lastHeartbeat) / 1000);
+      workerHeartbeatLagSeconds = Math.max(
+        0,
+        (Date.now() - lastHeartbeat) / 1000
+      );
     } else {
       workerHeartbeatLagSeconds = 999999; // Never seen
     }
@@ -81,8 +84,15 @@ app.get("/health", async (_req: Request, res: Response) => {
     }
 
     // 3. Check if there are actual unprocessed events waiting
-    const workerBookmark = (await redisClient.get("analytics_worker:last_id")) || "0-0";
-    const pendingEvents = await redisClient.xread("COUNT", 1, "STREAMS", "events", workerBookmark);
+    const workerBookmark =
+      (await redisClient.get("analytics_worker:last_id")) || "0-0";
+    const pendingEvents = await redisClient.xread(
+      "COUNT",
+      1,
+      "STREAMS",
+      "events",
+      workerBookmark
+    );
     if (pendingEvents && pendingEvents.length > 0) {
       const [, entries] = pendingEvents[0];
       if (entries && entries.length > 0) {
