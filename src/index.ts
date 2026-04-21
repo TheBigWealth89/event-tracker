@@ -51,7 +51,19 @@ app.get("/health", async (_req: Request, res: Response) => {
   let workerLagSeconds = 0;
   let workerEventsTotal = 0;
   let workerLastProcessedAt: string | null = null;
+  let workerHeartbeatLagSeconds = 0;
+  let hasUnprocessedEvents = false;
   try {
+    // 1. Check Heartbeat (Liveness)
+    const heartbeatStr = await redisClient.get("worker:heartbeat");
+    if (heartbeatStr) {
+      const lastHeartbeat = new Date(heartbeatStr).getTime();
+      workerHeartbeatLagSeconds = Math.max(0, (Date.now() - lastHeartbeat) / 1000);
+    } else {
+      workerHeartbeatLagSeconds = 999999; // Never seen
+    }
+
+    // 2. Check Throughput/Lag
     const lastProcessedAtStr = await redisClient.get(
       "worker:last_processed_at"
     );
@@ -67,13 +79,28 @@ app.get("/health", async (_req: Request, res: Response) => {
       workerEventsTotal = parseInt(totalEventsStr, 10);
       if (isNaN(workerEventsTotal)) workerEventsTotal = 0;
     }
+
+    // 3. Check if there are actual unprocessed events waiting
+    const workerBookmark = (await redisClient.get("analytics_worker:last_id")) || "0-0";
+    const pendingEvents = await redisClient.xread("COUNT", 1, "STREAMS", "events", workerBookmark);
+    if (pendingEvents && pendingEvents.length > 0) {
+      const [, entries] = pendingEvents[0];
+      if (entries && entries.length > 0) {
+        hasUnprocessedEvents = true;
+      }
+    }
   } catch (err) {
     logger.error("Health check - Worker state error", err);
   }
 
   // Final Health Decision
-  // If worker lag is too high (> 40s) AND there are events waiting in the stream, flag as unhealthy
-  if (workerLagSeconds > 40 && streamLength > 0) {
+  // A. If worker process is offline (heartbeat stale) -> Unhealthy
+  if (workerHeartbeatLagSeconds > 30) {
+    isHealthy = false;
+  }
+
+  // B. If worker is alive but behind (> 40s) AND there are events waiting -> Unhealthy
+  if (workerLagSeconds > 40 && hasUnprocessedEvents) {
     isHealthy = false;
   }
 
@@ -96,8 +123,10 @@ app.get("/health", async (_req: Request, res: Response) => {
       stream_length: streamLength,
     },
     worker: {
+      status: workerHeartbeatLagSeconds > 30 ? "offline" : "online",
+      heartbeat_lag_seconds: Number(workerHeartbeatLagSeconds.toFixed(2)),
       last_processed_at: workerLastProcessedAt,
-      lag_seconds: workerLagSeconds,
+      lag_seconds: Number(workerLagSeconds.toFixed(2)),
       events_processed_total: workerEventsTotal,
     },
   };

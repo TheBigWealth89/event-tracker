@@ -111,6 +111,9 @@ async function startWorker() {
   logger.info(`Starting stream from last known ID: ${lastReadId}`);
 
   while (!isShuttingDown) {
+    // Signal that the worker is alive
+    await redisClient.set("worker:heartbeat", new Date().toISOString());
+
     // Pass the current bookmark in, get the next one back.
     lastReadId = await processEvents(lastReadId);
   }
