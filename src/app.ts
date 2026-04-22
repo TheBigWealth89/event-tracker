@@ -151,6 +151,7 @@ export function createApp() {
   app.use("/", trackRouter);
 
   // Error handling middleware
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof ZodError) {
       const { fieldErrors } = err.flatten();
