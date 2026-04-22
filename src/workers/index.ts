@@ -5,7 +5,7 @@ const AGGREGATION_KEY = "analytics:event_counts"; // The name of our Redis Hash
 const STREAM_KEY = "events";
 const BOOKMARK_KEY = "analytics_worker:last_id";
 
-async function processEvents(lastReadId: string): Promise<string> {
+export async function processEvents(lastReadId: string): Promise<string> {
   // Track the ID of the last read event
   let nextReadId = lastReadId;
   try {
@@ -65,7 +65,7 @@ async function processEvents(lastReadId: string): Promise<string> {
 
     // WRITING TO POSTGRES TIMESCALEDB
     if (Object.keys(grandTotals).length > 0) {
-      console.log("Writing aggregated totals to TimescaleDB...");
+      logger.info("Writing aggregated totals to TimescaleDB...");
       try {
         const values: (string | number)[] = [];
         const valueStrings: string[] = [];
@@ -78,7 +78,7 @@ async function processEvents(lastReadId: string): Promise<string> {
           values.push(eventName, count);
           paramIndex += 2;
         }
-        console.log("Writing to db");
+        logger.debug("Writing to db");
         const queryText = `
             INSERT INTO event_counts (bucket, event_name, count)
             VALUES ${valueStrings.join(", ")} 
@@ -87,7 +87,7 @@ async function processEvents(lastReadId: string): Promise<string> {
         `;
 
         await pool.query(queryText, values);
-        console.log("✅ Successfully updated totals in TimescaleDB.");
+        logger.info("✅ Successfully updated totals in TimescaleDB.");
       } catch (dbError) {
         logger.error("Failed to write to TimescaleDB:", dbError);
       }
@@ -97,10 +97,11 @@ async function processEvents(lastReadId: string): Promise<string> {
   }
   return nextReadId;
 }
+
 let isShuttingDown = false;
 
 // Start the worker loop
-async function startWorker() {
+export async function startWorker() {
   await connectAll();
   logger.info(
     `Stream worker started. Listening for events on stream '${STREAM_KEY}'.`
@@ -139,4 +140,6 @@ function handleShutdown(signal: string) {
 process.on("SIGTERM", () => handleShutdown("SIGTERM"));
 process.on("SIGINT", () => handleShutdown("SIGINT"));
 
-startWorker();
+if (require.main === module) {
+  startWorker();
+}

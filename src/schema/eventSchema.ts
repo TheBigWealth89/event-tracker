@@ -1,9 +1,11 @@
 import { z } from "zod";
 
 export const trackEventSchema = z.object({
-  eventName: z.string().min(1, { message: "Event name is required" }),
+  eventName: z
+    .string("Event name is required")
+    .min(1, "Event name is required"),
 
-  url: z.string({ message: "A valid url is required" }),
+  url: z.string("A valid url is required"),
 
   userId: z.string().optional(),
   metadata: z.record(z.string(), z.any()).optional(),

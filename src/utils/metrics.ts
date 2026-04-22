@@ -36,7 +36,7 @@ export async function buildPrometheusText(): Promise<string> {
 
   // Worker State
   let lagSeconds = 0;
-  let heartbeatLagSeconds = 0;
+  let heartbeatLagSeconds = 999999;
   let totalEvents = 0;
   try {
     const heartbeatStr = await redisClient.get("worker:heartbeat");

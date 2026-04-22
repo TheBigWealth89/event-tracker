@@ -378,6 +378,13 @@ tls: redisUrl.startsWith("rediss://") ? { rejectUnauthorized: false } : undefine
 ```
 `rediss://` (double-s) is the TLS-enabled Redis URL scheme used by RedisCloud.
 
+**Pool Performance Tuning:**
+To minimize latency when using remote cloud databases, the pool is configured to keep connections "warm":
+- `max: 10`: Limits concurrent connections to prevent exhausting DB resources.
+- `min: 2`: Ensures at least 2 connections stay open, avoiding the multi-second SSL handshake penalty on every health check.
+- `idleTimeoutMillis: 60000`: Connections stay alive for 1 minute before closing.
+- `connectionTimeoutMillis: 5000`: Fails early if the DB is unreachable.
+
 **`connectAll()` idempotency:** The `isConnected` flag prevents the function from running twice if called from multiple places (API + Worker both call it).
 
 ---
@@ -682,7 +689,7 @@ node:20-alpine
   → (API only) COPY src/public → dist/public
   → Run as non-root user nodejs:1001
   → EXPOSE 5000 (API only)
-  → HEALTHCHECK (API only)
+  → HEALTHCHECK (API only) — Configured with a **10-second timeout** to accommodate network latency when checking remote database health.
 ```
 
 > [!NOTE]
@@ -748,7 +755,7 @@ node:20-alpine
 |---|---|---|---|
 | **Streams** | `XADD`, `XREAD BLOCK` | Router → Worker | Durable, ordered event log; decouples producers from consumers |
 | **Hash** | `HINCRBY`, `HGETALL` | Worker, Router | Efficient in-memory aggregation store per event name |
-| **String** | `SET`, `GET` | Worker | Persistent bookmark (last processed stream ID) |
+| **String** | `SET`, `GET` | Worker, API | Persistent bookmark (`analytics_worker:last_id`) and Worker Liveness Heartbeat (`worker:heartbeat`) |
 | **Pub/Sub** | `PUBLISH`, `SUBSCRIBE` | Worker → Sockets | Push-based real-time notifications without polling |
 | **Pipeline/Multi** | `MULTI`, `EXEC` | Worker | Atomic batch writes — all `HINCRBY` calls succeed or fail together |
 | **Duplicate client** | `redisClient.duplicate()` | Sockets | A subscribed client can't run normal commands; duplicate is the pattern |
@@ -787,16 +794,17 @@ Located at `GET /health`, this endpoint provides a deep inspection of the system
 
 - **Postgres Check**: Actively pings the database and reports latency in `ms`.
 - **Redis Check**: Pings the Redis instance and reports the current stream length.
-- **Worker Check**: Reads the worker's "heartbeat" from Redis to report exactly when it last processed a batch.
+- **Worker Check**: Provides both **Liveness** (is it alive?) and **Throughput** (is it keeping up?) metrics.
 - **Resource Usage**: Reports system uptime and memory (RSS and Heap) in MB.
 
 **Threshold-based failure:**
 The endpoint returns **HTTP 503 (Service Unavailable)** instead of 200 if:
-1. Postgres is unreachable.
-2. Redis is unreachable.
-3. **Worker Lag > 40 seconds** AND the Redis stream contains unprocessed events.
+1.  Postgres is unreachable.
+2.  Redis is unreachable.
+3.  **Worker Offline**: The heartbeat is older than 30 seconds (indicates the process is dead or stalled).
+4.  **Worker Lagging**: The worker lag is > 40 seconds **AND** there are actual pending events in the Redis stream.
 
-This prevents the system from reporting "OK" when the background processing is silently stalled.
+This prevents the system from reporting "OK" when the background processing is silently stalled or dead.
 
 ### 13.2 `/metrics` Endpoint (Prometheus)
 
@@ -806,8 +814,9 @@ Exposes real-time telemetry at `GET /metrics` in the **Prometheus text expositio
 |---|---|---|
 | `event_tracker_uptime_seconds` | Gauge | How long the API process has been running. |
 | `event_tracker_memory_heap_used_bytes` | Gauge | Current heap memory consumption. |
-| `event_tracker_redis_stream_length` | Gauge | Buffer size (backlog) in Redis. |
-| `event_tracker_worker_lag_seconds` | Gauge | Time since worker last finished a batch. |
+| `event_tracker_redis_stream_length` | Gauge | Total event log size in Redis. |
+| `event_tracker_worker_heartbeat_lag_seconds` | Gauge | Seconds since the worker last signaled liveness. |
+| `event_tracker_worker_lag_seconds` | Gauge | Seconds since the worker last processed a batch. |
 | `event_tracker_worker_events_processed_total`| Counter | Cumulative total of events consumed from the stream. |
 
 **Zero-dependency implementation**: To keep the production image small and fast, these metrics are constructed manually in `src/utils/metrics.ts` rather than using a heavy client library.
