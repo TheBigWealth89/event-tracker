@@ -7,12 +7,14 @@ import { ZodError } from "zod";
 import logger from "./utils/logger";
 import path from "path";
 import { buildPrometheusText } from "./utils/metrics";
+import { globalLimiter } from "./middleware/rateLimiter.middleware";
 
 export function createApp() {
   const app = express();
 
   app.use(express.json());
   app.use(express.static(path.join(__dirname, "public")));
+  app.use(globalLimiter);
 
   // Health checks
   app.get("/health", async (_req: Request, res: Response) => {

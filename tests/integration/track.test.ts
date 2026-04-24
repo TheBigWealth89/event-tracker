@@ -18,7 +18,10 @@ describe("POST /track", () => {
       metadata: { foo: "bar" }
     };
 
-    const response = await request.post("/track").send(event);
+    const response = await request
+      .post("/track")
+      .set("x-api-key", "test-api-key")
+      .send(event);
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
@@ -29,12 +32,28 @@ describe("POST /track", () => {
     expect(streamLen).toBeGreaterThan(0);
   });
 
+  it("should return 401 if API key is missing", async () => {
+    const response = await request.post("/track").send({ eventName: "test" });
+    expect(response.status).toBe(401);
+  });
+
+  it("should return 403 if API key is invalid", async () => {
+    const response = await request
+      .post("/track")
+      .set("x-api-key", "wrong-key")
+      .send({ eventName: "test" });
+    expect(response.status).toBe(403);
+  });
+
   it("should return 400 for invalid payload", async () => {
     const invalidEvent = {
       url: "http://test.com" // Missing eventName
     };
 
-    const response = await request.post("/track").send(invalidEvent);
+    const response = await request
+      .post("/track")
+      .set("x-api-key", "test-api-key")
+      .send(invalidEvent);
 
     expect(response.status).toBe(400);
     expect(response.body.errors).toHaveProperty("eventName");

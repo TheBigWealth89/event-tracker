@@ -50,11 +50,14 @@ describe("E2E: Track to Socket Flow", () => {
     });
 
     // 1. Track an event via HTTP
-    await request.post("/track").send({
-      eventName: "purchase",
-      url: "http://shop.com",
-      userId: "customer_1"
-    });
+    await request
+      .post("/track")
+      .set("x-api-key", "test-api-key")
+      .send({
+        eventName: "purchase",
+        url: "http://shop.com",
+        userId: "customer_1"
+      });
 
     // 2. Manually trigger worker processing (simulating the separate process)
     await processEvents("0-0");

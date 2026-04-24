@@ -1,5 +1,7 @@
 import express, { Request, Response } from "express";
 import { validate } from "../middleware/validation.middleware";
+import { apiKey } from "../middleware/apiKey.middleware";
+import { writeLimiter } from "../middleware/rateLimiter.middleware";
 import { trackEventSchema, TrackEventInput } from "../schema/eventSchema";
 import { redisClient, pool } from "../db/connection";
 import logger from "../utils/logger";
@@ -72,6 +74,8 @@ route.get("/analytics", async (req: Request, res: Response) => {
 
 route.post(
   "/track",
+  apiKey,
+  writeLimiter,
   validate(trackEventSchema), // validation middleware
   async (req: Request<object, object, TrackEventInput>, res: Response) => {
     // event payload from the request body
