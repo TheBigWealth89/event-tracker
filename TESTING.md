@@ -42,9 +42,12 @@ graph TD
 
 ### 2. Integration Tests (`tests/integration/`)
 
-- **Focus**: API endpoints and database communication.
+- **Focus**: API endpoints, database communication, and middleware enforcement.
 - **Dependencies**: Real Docker containers (Postgres/Redis).
-- **Goal**: Verify that your SQL and Redis queries work correctly.
+- **Goal**: Verify that your SQL and Redis queries work correctly and that security/policy middleware like rate limiting is properly enforced.
+
+#### Rate Limiting Tests
+We use low limits (e.g., 2-5 requests) during integration testing to verify that the `429 Too Many Requests` response is correctly triggered without generating excessive traffic or causing long delays in the test suite. These limits are configured via environment variables in `.env.test`.
 
 ### 3. E2E Tests (`tests/e2e/`)
 
