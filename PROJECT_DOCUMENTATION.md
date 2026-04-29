@@ -11,17 +11,22 @@
 3. [Directory Structure](#3-directory-structure)
 4. [End-to-End Data Flow](#4-end-to-end-data-flow)
 5. [Module Deep Dives](#5-module-deep-dives)
-   - [Entry Point — `src/index.ts`](#51-entry-point--srcindexts)
-   - [Config — `src/config/loadEnv.ts`](#52-config--srcconfigloadenvts)
-   - [Database — `src/db/connection.ts`](#53-database--srcdbconnectionts)
-   - [Router — `src/router/eventTracker.ts`](#54-router--srcroutereventtrackersts)
-   - [Schema — `src/schema/eventSchema.ts`](#55-schema--srcschemaeventschema ts)
-   - [Middleware — `src/middleware/validation.middleware.ts`](#56-middleware--srcmiddlewarevalidationmiddlewarets)
-   - [Worker — `src/workers/index.ts`](#57-worker--srcworkersindexts)
-   - [Sockets — `src/sockets/index.ts`](#58-sockets--srcsocketsindexts)
-   - [Logger — `src/utils/logger.ts`](#59-logger--srcutilsloggerts)
-   - [Dashboard UI — `src/public/index.html`](#510-dashboard-ui--srcpublicindexhtml)
-   - [Dashboard Logic — `src/public/js/dashboard.js`](#511-dashboard-logic--srcpublicjsdashboardjs)
+   - [Boot — `src/index.ts`](#51-boot--srcindexts)
+   - [App Factory — `src/app.ts`](#52-app-factory--srcappts)
+   - [Config — `src/config/loadEnv.ts`](#53-config--srcconfigloadenvts)
+   - [Database — `src/db/connection.ts`](#54-database--srcdbconnectionts)
+   - [Router — `src/router/eventTracker.ts`](#55-router--srcroutereventtrackersts)
+   - [Schema — `src/schema/eventSchema.ts`](#56-schema--srcschemaeventschema ts)
+   - [Middleware — `src/middleware/validation.middleware.ts`](#57-middleware--srcmiddlewarevalidationmiddlewarets)
+   - [Rate Limiter — `src/middleware/rateLimiter.middleware.ts`](#58-rate-limiter--srcmiddlewareratelimitermiddlewarets)
+   - [API Key Auth — `src/middleware/apiKey.middleware.ts`](#59-api-key-auth--srcmiddlewareapikeymiddlewarets)
+   - [Worker — `src/workers/index.ts`](#510-worker--srcworkersindexts)
+   - [Sockets — `src/sockets/index.ts`](#511-sockets--srcsocketsindexts)
+   - [Logger — `src/utils/logger.ts`](#512-logger--srcutilsloggerts)
+   - [Metrics — `src/utils/metrics.ts`](#513-metrics--srcutilsmetricsts)
+   - [Dashboard UI — `src/public/index.html`](#514-dashboard-ui--srcpublicindexhtml)
+   - [Dashboard Logic — `src/public/js/dashboard.js`](#515-dashboard-logic--srcpublicjsdashboardjs)
+   - [Styles — `src/public/style.css`](#516-styles--srcpublicstylecss)
 6. [Database Schema — `sql/init.sql`](#6-database-schema--sqlinitsql)
 7. [Docker & Containerization](#7-docker--containerization)
 8. [CI/CD — GitHub Actions](#8-cicd--github-actions)
@@ -30,6 +35,7 @@
 11. [Key Redis Concepts Used](#11-key-redis-concepts-used)
 12. [Dependency Map](#12-dependency-map)
 13. [Observability & Health Checks](#13-observability--health-checks)
+14. [Testing Strategy](#14-testing-strategy)
 
 ---
 
@@ -114,7 +120,8 @@ event-tracker/
 │   └── worker.Dockerfile         # Worker service Dockerfile
 │
 ├── src/                          # All TypeScript source code
-│   ├── index.ts                  # Main entry point (API server bootstrap)
+│   ├── index.ts                  # Thin boot file — calls createApp(), connectAll(), listen()
+│   ├── app.ts                    # App factory: Express setup, middleware, routes, graceful shutdown
 │   │
 │   ├── config/
 │   │   └── loadEnv.ts            # .env loader (skipped in production)
@@ -123,13 +130,15 @@ event-tracker/
 │   │   └── connection.ts         # PostgreSQL pool + Redis client (shared)
 │   │
 │   ├── router/
-│   │   └── eventTracker.ts       # Express routes: POST /track, GET /dashboard
+│   │   └── eventTracker.ts       # Express routes: POST /track, GET /dashboard, GET /analytics
 │   │
 │   ├── schema/
 │   │   └── eventSchema.ts        # Zod schema for incoming event payloads
 │   │
 │   ├── middleware/
-│   │   └── validation.middleware.ts  # Generic Zod validation middleware
+│   │   ├── validation.middleware.ts   # Generic Zod validation middleware factory
+│   │   ├── rateLimiter.middleware.ts  # globalLimiter + writeLimiter (express-rate-limit)
+│   │   └── apiKey.middleware.ts       # x-api-key header authentication
 │   │
 │   ├── workers/
 │   │   └── index.ts              # Background worker: stream consumer + DB writer
@@ -138,28 +147,52 @@ event-tracker/
 │   │   └── index.ts              # Socket.IO init + Redis Pub/Sub subscriber
 │   │
 │   ├── utils/
-│   │   ├── logger.ts             # Winston logger (console + file transports)
+│   │   ├── logger.ts             # Winston logger (structured, PII-redacting)
 │   │   └── metrics.ts            # Prometheus metrics builder (zero-dependency)
 │   │
-│   ├── public/
-│   │   ├── index.html            # Static HTML dashboard UI
-│   │   ├── style.css             # Dashboard CSS (dark/glassmorphism theme)
-│   │   └── js/
-│   │       └── dashboard.js      # Client-side render + Socket.IO logic
+│   └── public/
+│       ├── index.html            # Static HTML dashboard UI
+│       ├── style.css             # Dashboard CSS (dark/glassmorphism theme)
+│       └── js/
+│           └── dashboard.js      # Client-side render + Socket.IO logic
+│
+├── tests/                        # Automated test suite (Jest + Docker)
+│   ├── globalSetup.ts            # Spins up docker-compose.test.yml before all tests
+│   ├── globalTeardown.ts         # Tears down test containers after all tests
+│   ├── setup.ts                  # Per-file setup (env config)
+│   ├── unit/                     # Pure logic tests — no DB required
+│   │   ├── schema.test.ts
+│   │   ├── validation.middleware.test.ts
+│   │   ├── apiKey.middleware.test.ts
+│   │   ├── rateLimiter.middleware.test.ts
+│   │   └── metrics.test.ts
+│   ├── integration/              # Real Docker containers (Postgres + Redis)
+│   │   ├── track.test.ts
+│   │   ├── stats.test.ts
+│   │   ├── analytics.test.ts
+│   │   ├── health.test.ts
+│   │   ├── metrics-endpoint.test.ts
+│   │   └── rateLimiter.test.ts
+│   └── e2e/                      # Full-stack: event → stream → socket
+│       └── track-to-socket.test.ts
 │
 ├── sql/
 │   └── init.sql                  # TimescaleDB table creation + hypertable setup
 │
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                # GitHub Actions CI (build, test, lint)
+│       ├── ci.yml                # GitHub Actions CI (build, test, lint)
+│       └── test.yml              # GitHub Actions test pipeline (coverage gate)
 │
 ├── logs/                         # Winston log output (error.log, combined.log)
 ├── dist/                         # Compiled JavaScript output (from tsc)
 │
 ├── .env                          # Local secrets (not committed to git)
 ├── .example.env                  # Template for env variables
+├── .env.test                     # Environment variables for the test suite
 ├── docker-compose.yml            # Orchestrates API + Worker containers
+├── docker-compose.test.yml       # Isolated test infrastructure (Postgres:5433, Redis:6380)
+├── jest.config.ts                # Jest configuration (ts-jest, 80% coverage threshold)
 ├── tsconfig.json                 # TypeScript compiler configuration
 ├── package.json                  # NPM scripts and dependencies
 ├── eslint.config.mjs             # ESLint rules
@@ -306,44 +339,47 @@ The client-side JavaScript (`dashboard.js`) then:
 
 ## 5. Module Deep Dives
 
-### 5.1 Entry Point — `src/index.ts`
+### 5.1 Boot — `src/index.ts`
 
-**What it does:** Bootstraps the entire API server process.
+**What it does:** A thin 22-line process entry point. Its only responsibilities are:
 
-```
-loadEnv          (via db/connection import chain)
-    ↓
-createServer()   (Node HTTP)
-    ↓
-initSocket()     (attaches Socket.IO to the HTTP server)
-    ↓
-Express middleware stack:
-  express.json()
-  express.static()  (serves /public)
-    ↓
-Routes:
-  GET  /health     → Advanced 503-aware health check
-  GET  /metrics    → Prometheus telemetry exposition
-  use  /           → trackRouter (handles /track, /dashboard, and /api/stats)
-    ↓
-Global error handler (ZodError → 400, other → 500)
-    ↓
-connectAll()     (establishes Postgres + Redis connections)
-    ↓
-httpServer.listen(PORT, "0.0.0.0")
-```
+1. Call `createApp()` from `src/app.ts` to get the configured HTTP server.
+2. Call `connectAll()` to establish Postgres and Redis connections.
+3. Call `httpServer.listen()` to start accepting traffic.
 
-**Key design note:** The server only starts listening **after** `connectAll()` resolves. If either database connection fails at startup, the process exits with code `1` rather than serving traffic against broken connections.
-
-**Graceful Shutdown:** The API server implements a shutdown handler for `SIGTERM` and `SIGINT` signals.
-1.  **Stop HTTP**: Calls `httpServer.close()` to stop accepting new requests while allowing current ones to finish.
-2.  **Cleanup Sockets**: Calls `closeSocket()` to shut down Socket.IO and its Redis subscriber.
-3.  **Close Shared DBs**: Quits the main `redisClient` and ends the PostgreSQL `pool`.
-4.  **Failsafe**: A 10-second timeout ensures the process exits even if cleanup hangs.
+If `connectAll()` rejects, the process exits with code `1` rather than serving traffic against broken connections.
 
 ---
 
-### 5.2 Config — `src/config/loadEnv.ts`
+### 5.2 App Factory — `src/app.ts`
+
+**What it does:** Exports `createApp()`, a factory function that builds and returns the fully configured Express application and HTTP server.
+
+**Middleware stack (in order):**
+```
+express.json()          → Parse JSON request bodies
+express.static()        → Serve /public assets
+globalLimiter           → Baseline rate limit (30 req/10min per IP)
+```
+
+**Routes wired:**
+```
+GET  /health    → Deep 503-aware health check
+GET  /metrics   → Prometheus exposition text
+use  /          → trackRouter (POST /track, GET /dashboard, GET /api/stats, GET /analytics)
+```
+
+**Global error handler:** Catches `ZodError` → `400` with field-level details, all others → `500`.
+
+**Graceful Shutdown** is registered inside `createApp()`:
+1. `httpServer.close()` — stops accepting new requests, drains in-flight ones.
+2. `closeSocket()` — shuts down Socket.IO and its Redis subscriber.
+3. `redisClient.quit()` + `pool.end()` — closes shared DB connections.
+4. A 10-second failsafe `setTimeout` forces exit if cleanup hangs.
+
+---
+
+### 5.3 Config — `src/config/loadEnv.ts`
 
 **What it does:** Loads the `.env` file in development; skips gracefully in production.
 
@@ -355,7 +391,7 @@ This module is side-effect: it runs `loadEnvironmentVariables()` immediately on 
 
 ---
 
-### 5.3 Database — `src/db/connection.ts`
+### 5.4 Database — `src/db/connection.ts`
 
 **What it does:** Creates and exports the two shared database clients used across the entire app.
 
@@ -389,7 +425,7 @@ To minimize latency when using remote cloud databases, the pool is configured to
 
 ---
 
-### 5.4 Router — `src/router/eventTracker.ts`
+### 5.5 Router — `src/router/eventTracker.ts`
 
 **What it does:** Defines all HTTP API routes.
 
@@ -425,9 +461,17 @@ ID          | Field    | Value
             | metadata | '{"browser":"Chrome"}'
 ```
 
+**`POST /track` middleware chain:**
+```
+apiKey          → x-api-key header validation (401/403 on failure)
+writeLimiter    → 30 req/min per IP (429 on breach)
+validate(...)   → Zod schema check (400 on invalid body)
+→ xadd to Redis Stream
+```
+
 ---
 
-### 5.5 Schema — `src/schema/eventSchema.ts`
+### 5.6 Schema — `src/schema/eventSchema.ts`
 
 **What it does:** Defines the shape and validation rules for incoming event payloads using **Zod**.
 
@@ -446,7 +490,7 @@ This schema is the **single source of truth** for what a valid event looks like.
 
 ---
 
-### 5.6 Middleware — `src/middleware/validation.middleware.ts`
+### 5.7 Middleware — `src/middleware/validation.middleware.ts`
 
 **What it does:** Generic, reusable Express middleware factory that takes a Zod schema and returns a middleware function.
 
@@ -461,7 +505,56 @@ This is a **higher-order function** pattern — `validate` is called at route-re
 
 ---
 
-### 5.7 Worker — `src/workers/index.ts`
+### 5.8 Rate Limiter — `src/middleware/rateLimiter.middleware.ts`
+
+**What it does:** Exports two `express-rate-limit` instances that protect the API from abuse.
+
+| Export | Applied on | Window | Max Requests | On Breach |
+|---|---|---|---|---|
+| `globalLimiter` | All routes (in `app.ts`) | 10 minutes | 30 per IP | `429` |
+| `writeLimiter` | `POST /track` only | 1 minute | 30 per IP | `429` |
+
+Both limiters return `RateLimit-*` standard headers (RFC draft) and a JSON body:
+```json
+{ "success": false, "message": "Too many requests. Please slow down and try again later." }
+```
+
+Limits are configurable via environment variables, making them easy to tighten for tests:
+
+| Variable | Default | Controls |
+|---|---|---|
+| `RATE_LIMIT_GLOBAL_WINDOW_MS` | `600000` (10 min) | Global window |
+| `RATE_LIMIT_GLOBAL_MAX` | `30` | Global max requests |
+| `RATE_LIMIT_WRITE_WINDOW_MS` | `60000` (1 min) | Write window |
+| `RATE_LIMIT_WRITE_MAX` | `30` | Write max requests |
+
+> [!NOTE]
+> During integration tests, `.env.test` sets these limits very low (e.g., 2–5 requests) so the `429` response can be triggered quickly without flooding the test infrastructure.
+
+---
+
+### 5.9 API Key Auth — `src/middleware/apiKey.middleware.ts`
+
+**What it does:** Protects `POST /track` by validating the `x-api-key` request header against a comma-separated list of valid keys stored in the `API_KEYS` environment variable.
+
+**Flow:**
+```
+req.headers['x-api-key']
+        ↓
+  missing? → 401 { success: false, message: "API key is required." }
+        ↓
+  not in API_KEYS list? → 403 { success: false, message: "Invalid API key." }
+        ↓
+  valid → next()
+```
+
+**Multi-key support:** `API_KEYS` accepts a comma-separated string (e.g., `"key-1, key-2, key-3"`). Each key is trimmed before comparison, so whitespace around commas is safely ignored.
+
+Invalid attempts are logged as `warn` with the requester's IP for audit trail purposes.
+
+---
+
+### 5.10 Worker — `src/workers/index.ts`
 
 **What it does:** The background process that consumes the Redis Stream, aggregates counts, publishes updates, and writes to PostgreSQL.
 
@@ -504,7 +597,7 @@ The worker uses an `isShuttingDown` flag and `SIGTERM`/`SIGINT` listeners. Becau
 
 ---
 
-### 5.8 Sockets — `src/sockets/index.ts`
+### 5.11 Sockets — `src/sockets/index.ts`
 
 **What it does:** Manages the Socket.IO server and the Redis Pub/Sub subscriber.
 
@@ -536,7 +629,7 @@ CORS is configured to `origin: "*"` — appropriate for a dev/demo setup, should
 
 ---
 
-### 5.9 Logger — `src/utils/logger.ts`
+### 5.12 Logger — `src/utils/logger.ts`
 
 **What it does:** Provides a structured, production-ready **Winston** logger that balances visibility with security.
 
@@ -557,7 +650,13 @@ error (0) → warn (1) → info (2) → http (3) → debug (4)
 
 ---
 
-### 5.10 Dashboard UI — `src/public/index.html`
+### 5.13 Metrics — `src/utils/metrics.ts`
+
+See [Section 13.2 — `/metrics` Endpoint](#132-metrics-endpoint-prometheus) for the full exposition.
+
+---
+
+### 5.14 Dashboard UI — `src/public/index.html`
 
 **What it does:** The static HTML page for the analytics dashboard.
 
@@ -567,7 +666,7 @@ error (0) → warn (1) → info (2) → http (3) → debug (4)
 - **Event Distribution** — A responsive grid of event cards (sorted by count descending).
 - **Empty State** — Shown when no events exist yet.
 
-### 5.11 Dashboard Logic — `src/public/js/dashboard.js`
+### 5.15 Dashboard Logic — `src/public/js/dashboard.js`
 
 **What it does:** Provides the Client-Side Rendering (CSR) and Socket.IO real-time binding.
 
@@ -580,7 +679,7 @@ Receives the raw Redis hash (either from HTTP or Socket), processes it into an a
 
 ---
 
-### 5.11 Styles — `src/public/style.css`
+### 5.16 Styles — `src/public/style.css`
 
 **What it does:** Styles the dashboard with a modern Web3/dark-mode aesthetic.
 
@@ -699,7 +798,9 @@ node:20-alpine
 
 ## 8. CI/CD — GitHub Actions
 
-**File:** `.github/workflows/ci.yml`
+Two workflows live in `.github/workflows/`.
+
+### `ci.yml` — Build & Lint
 
 **Triggers:** Push or Pull Request to `main`.
 
@@ -707,11 +808,21 @@ node:20-alpine
 1. `actions/checkout@v4` — clone the repo.
 2. `actions/setup-node@v4` with Node.js 20 + npm cache.
 3. `npm ci` — install exact dependencies from `package-lock.json`.
-4. `npm test` — runs `echo "No tests yet" && exit 0` (placeholder).
+4. `npm test` — runs the full Jest suite.
 5. `npx eslint` — lint the source code.
 
-> [!WARNING]
-> There are currently **no automated tests**. The `npm test` script is a placeholder. Adding unit tests (e.g. for the validation middleware or schema) and integration tests would greatly improve reliability of the CI pipeline.
+### `test.yml` — Coverage Gate
+
+**Triggers:** Push or Pull Request to `main` / `master`.
+
+**Steps:**
+1. `actions/checkout@v4` + `actions/setup-node@v4` (Node 20).
+2. `npm ci` — install dependencies.
+3. Verify Docker and Docker Compose are available on the runner.
+4. `npm run test:coverage` with `NODE_ENV=test` — spins up isolated containers via `docker-compose.test.yml`, runs all tests, and enforces the **80% coverage threshold** configured in `jest.config.ts`.
+
+> [!NOTE]
+> `test.yml` relies on the `globalSetup`/`globalTeardown` hooks in `jest.config.ts` to manage the test database lifecycle — no GitHub Services block is needed.
 
 ---
 
@@ -722,11 +833,12 @@ node:20-alpine
 | `dev` | `nodemon src/index.ts` | Start the API server in dev (auto-restarts on changes) |
 | `dev:worker` | `ts-node src/workers/index.ts` | Start the worker in dev (manual restart) |
 | `build` | `tsc` | Compile TypeScript → `dist/` for production |
+| `test` | `cross-env NODE_ENV=test jest --runInBand` | Run all tests sequentially (requires Docker) |
+| `test:coverage` | `cross-env NODE_ENV=test jest --runInBand --coverage` | Run tests with 80% coverage threshold |
 | `lint` | `eslint src/` | Check for code style issues |
 | `format` | `prettier --write ...` | Auto-format all source files |
 | `format:check` | `prettier --check ...` | Verify formatting (used in CI) |
 | `typecheck` | `tsc --noEmit` | Type-check without emitting files |
-| `test` | `echo "No tests yet" && exit 0` | Placeholder |
 | `prepare` | `husky` | Sets up Git pre-commit hooks via Husky |
 
 ---
@@ -743,6 +855,12 @@ node:20-alpine
 | `DB_NAME` | `event_tracker_36h0` | Yes | PostgreSQL database name |
 | `DB_USER` | `event_tracker_...` | Yes | PostgreSQL user |
 | `DB_PASSWORD` | `...` | Yes | PostgreSQL password |
+| `API_KEYS` | `key-1,key-2` | Yes (for `/track`) | Comma-separated valid API keys for `POST /track` |
+| `LOG_LEVEL` | `info` | No (default: `info`) | Winston log verbosity (`error`,`warn`,`info`,`http`,`debug`) |
+| `RATE_LIMIT_GLOBAL_WINDOW_MS` | `600000` | No (default: 600000) | Global rate limit window in ms |
+| `RATE_LIMIT_GLOBAL_MAX` | `30` | No (default: 30) | Max requests per IP in global window |
+| `RATE_LIMIT_WRITE_WINDOW_MS` | `60000` | No (default: 60000) | Write endpoint rate limit window in ms |
+| `RATE_LIMIT_WRITE_MAX` | `30` | No (default: 30) | Max write requests per IP per window |
 
 - **Development:** Set in `.env` (loaded by `config/loadEnv.ts`).
 - **Production (Docker):** Set via `docker-compose.yml` `environment:` block or the `.env` file referenced under `env_file:`.
@@ -766,16 +884,19 @@ node:20-alpine
 
 ```
 src/index.ts
-  ├── src/config/loadEnv.ts         (via db/connection import)
-  ├── src/db/connection.ts           → ioredis, pg
-  ├── src/router/eventTracker.ts
-  │     ├── src/middleware/validation.middleware.ts  → zod
-  │     ├── src/schema/eventSchema.ts               → zod
-  │     └── src/db/connection.ts
-  ├── src/sockets/index.ts
-  │     └── src/db/connection.ts
-  └── src/utils/logger.ts            → winston
-  └── src/utils/metrics.ts           → (zero-dependency)
+  ├── src/app.ts                             → express, http.createServer
+  │     ├── src/middleware/rateLimiter.middleware.ts  → express-rate-limit
+  │     ├── src/router/eventTracker.ts
+  │     │     ├── src/middleware/apiKey.middleware.ts
+  │     │     ├── src/middleware/rateLimiter.middleware.ts
+  │     │     ├── src/middleware/validation.middleware.ts  → zod
+  │     │     ├── src/schema/eventSchema.ts               → zod
+  │     │     └── src/db/connection.ts
+  │     ├── src/sockets/index.ts
+  │     │     └── src/db/connection.ts
+  │     ├── src/utils/logger.ts                    → winston
+  │     └── src/utils/metrics.ts                   → (zero-dependency)
+  └── src/db/connection.ts                     → ioredis, pg
 
 src/workers/index.ts
   ├── src/db/connection.ts
@@ -831,7 +952,8 @@ Exposes real-time telemetry at `GET /metrics` in the **Prometheus text expositio
 | `pg` | ^8.16.3 | PostgreSQL client (TimescaleDB) |
 | `zod` | ^4.1.9 | Schema validation + TypeScript inference |
 | `dotenv` | ^17.2.3 | `.env` file loader |
-| `winston` | (via @types/winston) | Structured logging |
+| `winston` | ^3.11.0 | Structured logging |
+| `express-rate-limit` | ^8.3.2 | Rate limiting middleware |
 
 **Dev dependencies:**
 
@@ -840,6 +962,105 @@ Exposes real-time telemetry at `GET /metrics` in the **Prometheus text expositio
 | `typescript` | Language compiler |
 | `ts-node` | Run TypeScript directly (dev worker) |
 | `nodemon` | Auto-restart on file save (dev server) |
+| `jest` + `ts-jest` | Test runner + TypeScript support |
+| `supertest` | HTTP integration test client |
+| `socket.io-client` | WebSocket client for E2E tests |
+| `cross-env` | Cross-platform env variable injection for test scripts |
+| `@types/*` | TypeScript type declarations |
 | `eslint` + `typescript-eslint` | Linting |
 | `prettier` | Code formatting |
 | `husky` | Git pre-commit hooks |
+
+---
+
+## 14. Testing Strategy
+
+The project uses a **three-layer testing pyramid** powered by **Jest**, **ts-jest**, **Supertest**, and **Docker Compose** for isolated infrastructure.
+
+### 14.1 Test Infrastructure
+
+Tests never touch production databases. Before the suite runs, `tests/globalSetup.ts` uses `execSync` to start `docker-compose.test.yml`, which spins up two isolated, ephemeral services:
+
+| Container | Image | Exposed Port | Used By |
+|---|---|---|---|
+| `event-tracker-db-test` | `timescale/timescaledb:latest-pg15` | `5433` | Integration + E2E tests |
+| `event-tracker-redis-test` | `redis:7-alpine` | `6380` | Integration + E2E tests |
+
+The setup script polls `docker inspect` every second for up to 30 seconds until the Postgres container reports `healthy`. After all tests complete, `tests/globalTeardown.ts` tears both containers down and cleans the data.
+
+Test-specific connection strings and low rate-limit thresholds are configured via `.env.test`.
+
+### 14.2 Jest Configuration (`jest.config.ts`)
+
+| Option | Value | Purpose |
+|---|---|---|
+| `preset` | `ts-jest` | Run TypeScript test files directly |
+| `testEnvironment` | `node` | Server-side environment |
+| `globalSetup` | `tests/globalSetup.ts` | Start Docker containers |
+| `globalTeardown` | `tests/globalTeardown.ts` | Stop Docker containers |
+| `testMatch` | `**/tests/**/*.test.ts` | Discover all test files |
+| `--runInBand` | CLI flag | Sequential execution (prevents port conflicts) |
+| `forceExit` | `true` | Ensure process exits even if async handles linger |
+
+**Coverage thresholds** (enforced globally — CI fails if not met):
+```
+branches:   80%
+functions:  80%
+lines:      80%
+statements: 80%
+```
+
+Excluded from coverage: `src/index.ts`, `src/config/loadEnv.ts`, `src/db/connection.ts` (boot/infra files — tested indirectly).
+
+### 14.3 Layer 1 — Unit Tests (`tests/unit/`)
+
+No database. No network. All external dependencies are mocked by Jest.
+
+| File | What is tested |
+|---|---|
+| `schema.test.ts` | Zod schema: valid payloads pass, invalid ones return correct errors |
+| `validation.middleware.test.ts` | Middleware factory: calls `next()` on valid body, returns `400` on invalid |
+| `apiKey.middleware.test.ts` | API key guard: `next()` on valid key, `401` on missing, `403` on wrong key |
+| `rateLimiter.middleware.test.ts` | Both limiters export as callable middleware functions |
+| `metrics.test.ts` | `buildPrometheusText()` returns correctly formatted Prometheus text |
+
+### 14.4 Layer 2 — Integration Tests (`tests/integration/`)
+
+Requires running Docker containers (started automatically by `globalSetup`). Uses **Supertest** to send real HTTP requests against a live `createApp()` instance.
+
+| File | What is tested |
+|---|---|
+| `track.test.ts` | `POST /track` — valid event writes to Redis stream; missing API key returns 401 |
+| `stats.test.ts` | `GET /api/stats` — returns aggregated counts from Redis hash |
+| `analytics.test.ts` | `GET /analytics` — queries TimescaleDB with range params; validates response shape |
+| `health.test.ts` | `GET /health` — deep health check returns correct status fields |
+| `metrics-endpoint.test.ts` | `GET /metrics` — returns Prometheus text with correct Content-Type |
+| `rateLimiter.test.ts` | `POST /track` — triggers `429` after the configured write limit is exceeded |
+
+### 14.5 Layer 3 — End-to-End Tests (`tests/e2e/`)
+
+Full distributed stack: API server + Worker process + Redis + TimescaleDB + Socket.IO client.
+
+| File | What is tested |
+|---|---|
+| `track-to-socket.test.ts` | **"Track-to-Socket" flow** — POST an event, start the worker, assert that a Socket.IO `analytics-update` message arrives at the connected client within a timeout |
+
+This is the highest-confidence test in the suite. It verifies that the entire pipeline — from HTTP ingestion through Redis Streams, worker processing, Pub/Sub broadcast, to WebSocket delivery — works end-to-end.
+
+### 14.6 Running Tests
+
+```bash
+# Prerequisites: Docker Desktop must be running
+
+# Run the full suite (unit + integration + e2e)
+npm test
+
+# Run with coverage report (80% threshold enforced)
+npm run test:coverage
+
+# Run a single file
+npx jest tests/unit/schema.test.ts
+
+# Run only integration tests
+npx jest tests/integration/
+```
