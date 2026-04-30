@@ -232,14 +232,23 @@ Content-Type: application/json
 The route handler in `router/eventTracker.ts` calls:
 
 ```ts
-redisClient.xadd(
-  "events",     // Stream key
-  "*",          // Auto-generate entry ID (timestamp-based)
-  "userId",     eventPayload.userId,
-  "eventName",  eventPayload.eventName,
-  "url",        eventPayload.url,
-  "metadata",   JSON.stringify(eventPayload.metadata)
-);
+    const maxLen = Number(process.env.REDIS_STREAM_MAX_LENGTH) || 50000;
+    
+    await redisClient.xadd(
+      "events", // Redis stream key
+      "MAXLEN",
+      "~",
+      maxLen,
+      "*", // Auto-generate ID
+      "userId",
+      eventPayload.userId ?? "",
+      "eventName",
+      eventPayload.eventName ?? "",
+      "url",
+      eventPayload.url ?? "",
+      "metadata",
+      JSON.stringify(eventPayload.metadata ?? {})
+    );
 ```
 
 Redis Streams work like an append-only log. Each entry gets a unique monotonic ID (`<timestamp>-<seq>`). The stream acts as a durable buffer between the API and the Worker.
@@ -856,6 +865,7 @@ Two workflows live in `.github/workflows/`.
 | `DB_USER` | `event_tracker_...` | Yes | PostgreSQL user |
 | `DB_PASSWORD` | `...` | Yes | PostgreSQL password |
 | `API_KEYS` | `key-1,key-2` | Yes (for `/track`) | Comma-separated valid API keys for `POST /track` |
+| `REDIS_STREAM_MAX_LENGTH` | `50000` | No (default: `50000`) | Maximum number of events to retain in the Redis stream |
 | `LOG_LEVEL` | `info` | No (default: `info`) | Winston log verbosity (`error`,`warn`,`info`,`http`,`debug`) |
 | `RATE_LIMIT_GLOBAL_WINDOW_MS` | `600000` | No (default: 600000) | Global rate limit window in ms |
 | `RATE_LIMIT_GLOBAL_MAX` | `30` | No (default: 30) | Max requests per IP in global window |

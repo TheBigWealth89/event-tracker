@@ -80,9 +80,14 @@ route.post(
   async (req: Request<object, object, TrackEventInput>, res: Response) => {
     // event payload from the request body
     const eventPayload = req.body;
+    const maxLen = Number(process.env.REDIS_STREAM_MAX_LENGTH) || 50000;
+
     try {
       await redisClient.xadd(
         "events", // Redis stream key
+        "MAXLEN",
+        "~",
+        maxLen,
         "*", // Auto-generate ID
         "userId",
         eventPayload.userId ?? "",
