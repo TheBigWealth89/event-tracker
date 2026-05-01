@@ -54,6 +54,7 @@ We use low limits (e.g., 2-5 requests) during integration testing to verify that
 - **Focus**: The "Track-to-Socket" distributed flow.
 - **Dependencies**: Full stack (API + Worker + DB + Sockets).
 - **Goal**: Verify that an event travels safely from ingestion to live dashboard update.
+- **Stability**: Uses a 15-second timeout and `disconnectAll()` to prevent flakiness and resource leaks in CI.
 
 ---
 
@@ -63,7 +64,7 @@ The testing suite manages its own Docker containers automatically using Jest glo
 
 1.  **Start**: `tests/globalSetup.ts` spins up `docker-compose.test.yml`.
 2.  **Ready**: It waits until Postgres and Redis are fully healthy.
-3.  **Run**: Tests execute sequentially (`--runInBand`) using configurations from `.env.test`.
+3.  **Run**: Tests execute sequentially (`--runInBand`) using configurations from `.env.test`. Each test file must call `disconnectAll()` in its `afterAll` hook to ensure clean transitions between files.
 4.  **Stop**: `tests/globalTeardown.ts` removes the containers and cleans up data.
 
 ---
@@ -78,4 +79,4 @@ The testing suite manages its own Docker containers automatically using Jest glo
 
 ## 📈 Coverage Requirements
 
-The CI pipeline requires **80% coverage** for code formatting, linting, and type-safety check. Ensure your tests hit at least 80% of lines before pushing to production.
+The CI pipeline requires **80% statement, branch, function, and line coverage** before a build passes. Ensure your tests meet these thresholds before pushing to production.

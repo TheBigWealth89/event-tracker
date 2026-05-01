@@ -409,6 +409,7 @@ This module is side-effect: it runs `loadEnvironmentVariables()` immediately on 
 | `pool` | `pg.Pool` | PostgreSQL connection pool |
 | `redisClient` | `ioredis.Redis` | Redis client (used for commands + Pub/Sub publisher) |
 | `connectAll()` | `async function` | Runs both connection checks at startup |
+| `disconnectAll()` | `async function` | Closes all connections and resets the state (critical for tests) |
 
 **SSL handling:**
 ```ts
@@ -1054,7 +1055,7 @@ Full distributed stack: API server + Worker process + Redis + TimescaleDB + Sock
 
 | File | What is tested |
 |---|---|
-| `track-to-socket.test.ts` | **"Track-to-Socket" flow** — POST an event, start the worker, assert that a Socket.IO `analytics-update` message arrives at the connected client within a timeout |
+| `track-to-socket.test.ts` | **"Track-to-Socket" flow** — POST an event, start the worker, assert that a Socket.IO `analytics-update` message arrives at the connected client within a **15-second timeout**. Uses `disconnectAll()` for a clean teardown. |
 
 This is the highest-confidence test in the suite. It verifies that the entire pipeline — from HTTP ingestion through Redis Streams, worker processing, Pub/Sub broadcast, to WebSocket delivery — works end-to-end.
 

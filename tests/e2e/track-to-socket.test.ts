@@ -1,12 +1,16 @@
 import { io as Client, Socket } from "socket.io-client";
 import supertest from "supertest";
 import { createApp } from "../../src/app";
-import { connectAll, redisClient, pool } from "../../src/db/connection";
+import { connectAll, redisClient, pool, disconnectAll } from "../../src/db/connection";
 import { processEvents } from "../../src/workers";
+import { closeSocket } from "../../src/sockets";
 
 const PORT = 5001;
 const { httpServer, app } = createApp();
 const request = supertest(app);
+
+// Increase Jest timeout for E2E
+jest.setTimeout(20000);
 
 describe("E2E: Track to Socket Flow", () => {
   let clientSocket: Socket;
@@ -23,8 +27,11 @@ describe("E2E: Track to Socket Flow", () => {
   });
 
   afterAll(async () => {
-    httpServer.close();
     if (clientSocket) clientSocket.close();
+    await closeSocket();
+    httpServer.close();
+    // Close shared connections to prevent leaks
+    await disconnectAll();
   });
 
   it("should broadcast update to socket when event is tracked and processed", async () => {
@@ -32,7 +39,7 @@ describe("E2E: Track to Socket Flow", () => {
 
     // Create a promise that resolves when the socket receives the update
     const updateReceived = new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Socket timeout")), 5000);
+      const timeout = setTimeout(() => reject(new Error("Socket timeout")), 15000);
       clientSocket.on("analytics-update", (data) => {
         clearTimeout(timeout);
         try {

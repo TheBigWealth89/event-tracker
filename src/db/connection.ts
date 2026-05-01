@@ -45,7 +45,7 @@ redisClient.on("end", () => logger.warn("Redis connection closed"));
 // --- Central Connect Function ---
 let isConnected = false;
 export async function connectAll(): Promise<void> {
-  if (isConnected) return; // Prevent connecting multiple times
+  if (isConnected && redisClient.status === "ready") return; // Prevent connecting multiple times
 
   try {
     logger.info("🚀 Initializing all connections...");
@@ -64,4 +64,12 @@ export async function connectAll(): Promise<void> {
     isConnected = false;
     throw err;
   }
+}
+
+export async function disconnectAll(): Promise<void> {
+  logger.info("🔌 Closing all database connections...");
+  await redisClient.quit();
+  await pool.end();
+  isConnected = false;
+  logger.info("✅ Connections closed.");
 }
