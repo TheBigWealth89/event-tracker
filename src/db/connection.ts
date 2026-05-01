@@ -42,34 +42,74 @@ redisClient.on("ready", () => logger.info("Redis client ready"));
 redisClient.on("error", (err: Error) => logger.error("Redis error:", err));
 redisClient.on("end", () => logger.warn("Redis connection closed"));
 
-// --- Central Connect Function ---
-let isConnected = false;
+// --- Central Connection Management ---
+type ConnectionState = "disconnected" | "connecting" | "connected" | "failed";
+
+let connectionState: ConnectionState = "disconnected";
+let connectionPromise: Promise<void> | null = null;
+
+/**
+ * Initializes all database connections (PostgreSQL and Redis).
+ * Uses a state machine and shared promise to handle concurrency and retries.
+ */
 export async function connectAll(): Promise<void> {
-  if (isConnected && redisClient.status === "ready") return; // Prevent connecting multiple times
-
-  try {
-    logger.info("🚀 Initializing all connections...");
-
-    const client = await pool.connect();
-    client.release();
-    logger.info("✅ PostgreSQL connected.");
-
-    //Checking status because ioredis connects automatically
-    if (redisClient.status !== "ready") {
-      logger.info("⏳ Waiting for Redis connection...");
-    }
-    logger.info("✅ Redis connected.");
-    isConnected = true;
-  } catch (err) {
-    isConnected = false;
-    throw err;
+  // 1. If already connected and Redis is healthy, return immediately
+  if (connectionState === "connected" && redisClient.status === "ready") {
+    return;
   }
+
+  // 2. If a connection attempt is already in progress, wait for it
+  if (connectionState === "connecting" && connectionPromise) {
+    logger.info("⏳ Connection attempt already in progress, waiting...");
+    return connectionPromise;
+  }
+
+  // 3. Otherwise, start a new connection attempt
+  connectionState = "connecting";
+  connectionPromise = (async () => {
+    try {
+      logger.info("🚀 Initializing all database connections...");
+
+      // PostgreSQL connection check
+      const client = await pool.connect();
+      client.release();
+      logger.info("✅ PostgreSQL connected.");
+
+      // Redis connection check
+      if (redisClient.status !== "ready") {
+        logger.info("⏳ Waiting for Redis connection...");
+        // ioredis connects automatically, but we can wait for the 'ready' event if needed.
+        // For now, we trust the automatic connection and just check status.
+      }
+      logger.info("✅ Redis connected.");
+
+      connectionState = "connected";
+    } catch (err) {
+      connectionState = "failed";
+      logger.error("❌ Failed to initialize database connections:", err);
+      throw err;
+    } finally {
+      connectionPromise = null;
+    }
+  })();
+
+  return connectionPromise;
 }
 
+/**
+ * Closes all database connections and resets the state.
+ */
 export async function disconnectAll(): Promise<void> {
   logger.info("🔌 Closing all database connections...");
-  await redisClient.quit();
-  await pool.end();
-  isConnected = false;
-  logger.info("✅ Connections closed.");
+
+  try {
+    await redisClient.quit();
+    await pool.end();
+    connectionState = "disconnected";
+    connectionPromise = null;
+    logger.info("✅ Connections closed and state reset.");
+  } catch (err) {
+    logger.error("Error during disconnection:", err);
+    throw err;
+  }
 }

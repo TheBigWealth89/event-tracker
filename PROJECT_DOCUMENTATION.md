@@ -431,7 +431,7 @@ To minimize latency when using remote cloud databases, the pool is configured to
 - `idleTimeoutMillis: 60000`: Connections stay alive for 1 minute before closing.
 - `connectionTimeoutMillis: 5000`: Fails early if the DB is unreachable.
 
-**`connectAll()` idempotency:** The `isConnected` flag prevents the function from running twice if called from multiple places (API + Worker both call it).
+**`connectAll()` resiliency:** The function uses a state machine (`disconnected`, `connecting`, `connected`, `failed`) and a shared `connectionPromise` to ensure that simultaneous calls don't trigger redundant attempts and that failures can be recovered from cleanly.
 
 ---
 
