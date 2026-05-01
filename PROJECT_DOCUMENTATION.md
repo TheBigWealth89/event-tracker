@@ -629,7 +629,7 @@ Sockets module       subscriber.on("message", ...)
 Browser              socket.on("analytics-update", updateDashboard)
 ```
 
-CORS is configured to `origin: "*"` — appropriate for a dev/demo setup, should be locked down in production.
+CORS is configurable via the `ALLOWED_ORIGINS` environment variable. If multiple origins are needed, they can be provided as a comma-separated list. If the variable is not set, it defaults to `*` for convenience in development.
 
 **Cleanup Handler:**
  Exports a `closeSocket()` async function that:
@@ -871,6 +871,7 @@ Two workflows live in `.github/workflows/`.
 | `RATE_LIMIT_GLOBAL_MAX` | `30` | No (default: 30) | Max requests per IP in global window |
 | `RATE_LIMIT_WRITE_WINDOW_MS` | `60000` | No (default: 60000) | Write endpoint rate limit window in ms |
 | `RATE_LIMIT_WRITE_MAX` | `30` | No (default: 30) | Max write requests per IP per window |
+| `ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5000` | No (default: `*`) | Comma-separated list of allowed CORS origins for Socket.IO |
 
 - **Development:** Set in `.env` (loaded by `config/loadEnv.ts`).
 - **Production (Docker):** Set via `docker-compose.yml` `environment:` block or the `.env` file referenced under `env_file:`.

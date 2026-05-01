@@ -6,9 +6,13 @@ import { redisClient } from "../db/connection";
 let io: Server | null = null;
 // Initialize Socket.io server
 export const initSocket = (httpServer: HTTPServer) => {
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+    : "*";
+
   io = new Server(httpServer, {
     cors: {
-      origin: "*",
+      origin: allowedOrigins,
       methods: ["GET", "POST"],
     },
   });
