@@ -101,11 +101,17 @@ export function createApp() {
       logger.error("Health check - Worker state error", err);
     }
 
+    // Configuration for worker health thresholds
+    const heartbeatThreshold =
+      Number(process.env.HEALTH_WORKER_HEARTBEAT_THRESHOLD_SECONDS) || 30;
+    const lagThreshold =
+      Number(process.env.HEALTH_WORKER_LAG_THRESHOLD_SECONDS) || 40;
+
     // Final Health Decision
-    if (workerHeartbeatLagSeconds > 30) {
+    if (workerHeartbeatLagSeconds > heartbeatThreshold) {
       isHealthy = false;
     }
-    if (workerLagSeconds > 40 && hasUnprocessedEvents) {
+    if (workerLagSeconds > lagThreshold && hasUnprocessedEvents) {
       isHealthy = false;
     }
 
@@ -128,7 +134,7 @@ export function createApp() {
         stream_length: streamLength,
       },
       worker: {
-        status: workerHeartbeatLagSeconds > 30 ? "offline" : "online",
+        status: workerHeartbeatLagSeconds > heartbeatThreshold ? "offline" : "online",
         heartbeat_lag_seconds: Number(workerHeartbeatLagSeconds.toFixed(2)),
         last_processed_at: workerLastProcessedAt,
         lag_seconds: Number(workerLagSeconds.toFixed(2)),

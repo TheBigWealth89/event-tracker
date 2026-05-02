@@ -873,6 +873,8 @@ Two workflows live in `.github/workflows/`.
 | `RATE_LIMIT_WRITE_WINDOW_MS` | `60000` | No (default: 60000) | Write endpoint rate limit window in ms |
 | `RATE_LIMIT_WRITE_MAX` | `30` | No (default: 30) | Max write requests per IP per window |
 | `ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5000` | No (default: `*`) | Comma-separated list of allowed CORS origins for Socket.IO |
+| `HEALTH_WORKER_HEARTBEAT_THRESHOLD_SECONDS` | `30` | No (default: 30) | Heartbeat lag threshold for worker health check |
+| `HEALTH_WORKER_LAG_THRESHOLD_SECONDS` | `40` | No (default: 40) | Processing lag threshold for worker health check |
 
 - **Development:** Set in `.env` (loaded by `config/loadEnv.ts`).
 - **Production (Docker):** Set via `docker-compose.yml` `environment:` block or the `.env` file referenced under `env_file:`.
@@ -934,8 +936,8 @@ Located at `GET /health`, this endpoint provides a deep inspection of the system
 The endpoint returns **HTTP 503 (Service Unavailable)** instead of 200 if:
 1.  Postgres is unreachable.
 2.  Redis is unreachable.
-3.  **Worker Offline**: The heartbeat is older than 30 seconds (indicates the process is dead or stalled).
-4.  **Worker Lagging**: The worker lag is > 40 seconds **AND** there are actual pending events in the Redis stream.
+3.  **Worker Offline**: The heartbeat is older than `HEALTH_WORKER_HEARTBEAT_THRESHOLD_SECONDS` (default: 30s).
+4.  **Worker Lagging**: The worker lag exceeds `HEALTH_WORKER_LAG_THRESHOLD_SECONDS` (default: 40s) **AND** there are actual pending events in the Redis stream.
 
 This prevents the system from reporting "OK" when the background processing is silently stalled or dead.
 
