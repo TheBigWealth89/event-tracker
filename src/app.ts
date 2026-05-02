@@ -134,7 +134,8 @@ export function createApp() {
         stream_length: streamLength,
       },
       worker: {
-        status: workerHeartbeatLagSeconds > heartbeatThreshold ? "offline" : "online",
+        status:
+          workerHeartbeatLagSeconds > heartbeatThreshold ? "offline" : "online",
         heartbeat_lag_seconds: Number(workerHeartbeatLagSeconds.toFixed(2)),
         last_processed_at: workerLastProcessedAt,
         lag_seconds: Number(workerLagSeconds.toFixed(2)),
